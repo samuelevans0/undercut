@@ -6,15 +6,15 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 4 done: parseTitle pure parser (price, was-price, merchant, condition) in src/core/parse-title.js.
-52 tests green (34 prior + 18 new, including 2 regression tests for uncomma'd multi-digit prices).
+Task 5 done: classify pure classifier (category and reference-price buckets) in src/core/classify.js.
+67 tests green (52 prior + 15 new).
 
 ## Task ledger
 - [x] T1 scaffold
 - [x] T2 vendored libs
 - [x] T3 schema + db layer
 - [x] T4 parse-title
-- [ ] T5 classify
+- [x] T5 classify
 - [ ] T6 fingerprint
 - [ ] T7 reference prices
 - [ ] T8 score
