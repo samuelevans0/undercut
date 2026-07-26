@@ -46,6 +46,23 @@ describe("watchlist matching", () => {
     expect(evaluateRules(deal, [wl({ query: "lg under $200" })], []).forceNotify).toBe(true);
   });
 
+  it("accepts the < shorthand however it is spaced", () => {
+    // A \b in front of the whole alternation only holds when < is glued to a
+    // word char, so these all failed and the phrase stayed a search term.
+    for (const q of ["lg < 200", "lg <200", "240hz monitor <200", "lg<200"]) {
+      expect(evaluateRules(deal, [wl({ query: q })], []).forceNotify).toBe(true);
+    }
+  });
+
+  it("still enforces the ceiling when written with <", () => {
+    expect(evaluateRules(deal, [wl({ query: "lg < 50" })], []).forceNotify).toBe(false);
+  });
+
+  it("accepts the below and less than variants", () => {
+    expect(evaluateRules(deal, [wl({ query: "lg below 200" })], []).forceNotify).toBe(true);
+    expect(evaluateRules(deal, [wl({ query: "lg less than $200" })], []).forceNotify).toBe(true);
+  });
+
   it("ignores an empty query", () => {
     expect(evaluateRules(deal, [wl({ query: "   " })], []).forceNotify).toBe(false);
   });

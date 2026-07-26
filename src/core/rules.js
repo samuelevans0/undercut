@@ -1,7 +1,11 @@
 // Pure. No I/O. Watchlist and category rules force a notify independently of
 // the score, so precision alerts survive any threshold setting.
 
-const PRICE_PHRASE = /\b(?:under|below|less than|<)\s*\$?\s*(\d+(?:\.\d{1,2})?)\b/i;
+// The \b goes inside each word alternative, not in front of the whole group.
+// A leading \b before `<` only holds when `<` is glued to a word character, so
+// `lg < 200` and `<200` would both fail to parse. The phrase then survives into
+// the required search terms and the entry silently never matches anything.
+const PRICE_PHRASE = /(?:\bunder|\bbelow|\bless than|<)\s*\$?\s*(\d+(?:\.\d{1,2})?)\b/i;
 
 const OPS = {
   lt: (a, b) => a < b,

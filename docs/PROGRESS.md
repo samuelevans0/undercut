@@ -7,7 +7,7 @@ Read this file first when resuming. Update it at the end of every task.
 
 ## Status
 Task 9 done: watchlist and rule evaluator in src/core/rules.js.
-136 tests green (117 prior + 19 new).
+139 tests green (117 prior + 22 new, including 3 regression tests for price-phrase regex fix).
 
 ## Task ledger
 - [x] T1 scaffold
