@@ -480,9 +480,9 @@ describe("session", () => {
   it("rejects a tampered signature", async () => {
     const setCookie = await createSessionCookie("owner", secret);
     const original = setCookie.split(";")[0];
-    // Flip the last hex digit to something it definitely is not. Appending a
-    // fixed character would leave the value unchanged whenever the signature
-    // already ended in it, which is a 1-in-16 false pass.
+    // Flip the last hex digit to something it definitely is not. Overwriting it
+    // with a fixed character would leave the value unchanged whenever the
+    // signature already ended in that character, which is a 1-in-16 false pass.
     const value = original.slice(0, -1) + (original.endsWith("0") ? "1" : "0");
     expect(value).not.toBe(original);
     expect(await readSession(reqWithCookie(value), secret)).toBe(null);
@@ -712,17 +712,19 @@ INSERT OR IGNORE INTO sources (id, name, poll_interval_s, config_json) VALUES
   ('ebay',       'eBay',       300, '{}');
 ```
 
-- [ ] **Step 2: Create the local D1 database and apply the schema**
-
-```bash
-npx wrangler d1 create undercut-db
-```
-
-Paste the returned `database_id` into `wrangler.toml`, replacing `"local"`. Then apply the schema locally:
+- [ ] **Step 2: Apply the schema to the local D1 database**
 
 ```bash
 npx wrangler d1 execute undercut-db --local --file=./schema.sql
 ```
+
+Local D1 is a SQLite file keyed by the binding, so this works against the
+`database_id = "local"` placeholder without any Cloudflare account access.
+
+**Do not run `wrangler d1 create` during the build.** Creating the real remote
+database needs Cloudflare credentials and belongs to the deploy runbook in
+Task 21, which replaces the placeholder id then. The test suite runs against
+miniflare's own local D1 and never touches the remote one.
 
 - [ ] **Step 3: Make the test pool apply the schema**
 
