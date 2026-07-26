@@ -6,9 +6,8 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 8 done: pure scoring engine with outlier, discount, and heat components in
-src/core/score.js.
-117 tests green (94 prior + 23 new).
+Task 9 done: watchlist and rule evaluator in src/core/rules.js.
+136 tests green (117 prior + 19 new).
 
 ## Task ledger
 - [x] T1 scaffold
@@ -19,7 +18,7 @@ src/core/score.js.
 - [x] T6 fingerprint
 - [x] T7 reference prices
 - [x] T8 score
-- [ ] T9 rules
+- [x] T9 rules
 - [ ] T10 reddit source
 - [ ] T11 rss sources (slickdeals, woot)
 - [ ] T12 ebay source
