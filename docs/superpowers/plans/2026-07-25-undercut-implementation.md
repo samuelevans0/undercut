@@ -2355,6 +2355,23 @@ describe("watchlist matching", () => {
     expect(evaluateRules(deal, [wl({ query: "lg under $200" })], []).forceNotify).toBe(true);
   });
 
+  it("accepts the < shorthand however it is spaced", () => {
+    // A \b in front of the whole alternation only holds when < is glued to a
+    // word char, so these all failed and the phrase stayed a search term.
+    for (const q of ["lg < 200", "lg <200", "240hz monitor <200", "lg<200"]) {
+      expect(evaluateRules(deal, [wl({ query: q })], []).forceNotify).toBe(true);
+    }
+  });
+
+  it("still enforces the ceiling when written with <", () => {
+    expect(evaluateRules(deal, [wl({ query: "lg < 50" })], []).forceNotify).toBe(false);
+  });
+
+  it("accepts the below and less than variants", () => {
+    expect(evaluateRules(deal, [wl({ query: "lg below 200" })], []).forceNotify).toBe(true);
+    expect(evaluateRules(deal, [wl({ query: "lg less than $200" })], []).forceNotify).toBe(true);
+  });
+
   it("ignores an empty query", () => {
     expect(evaluateRules(deal, [wl({ query: "   " })], []).forceNotify).toBe(false);
   });
@@ -2440,7 +2457,11 @@ Expected: FAIL, cannot resolve `../src/core/rules.js`.
 // Pure. No I/O. Watchlist and category rules force a notify independently of
 // the score, so precision alerts survive any threshold setting.
 
-const PRICE_PHRASE = /\b(?:under|below|less than|<)\s*\$?\s*(\d+(?:\.\d{1,2})?)\b/i;
+// The \b goes inside each word alternative, not in front of the whole group.
+// A leading \b before `<` only holds when `<` is glued to a word character, so
+// `lg < 200` and `<200` would both fail to parse. The phrase then survives into
+// the required search terms and the entry silently never matches anything.
+const PRICE_PHRASE = /(?:\bunder|\bbelow|\bless than|<)\s*\$?\s*(\d+(?:\.\d{1,2})?)\b/i;
 
 const OPS = {
   lt: (a, b) => a < b,
