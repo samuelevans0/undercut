@@ -139,10 +139,21 @@ subtotal = outlier + discount + heat
 score    = clamp(0, 100, round(subtotal * weight - penalties))
 ```
 
+Component curves, all linear and clamped:
+
+- **outlier** reaches its full 50 when the price is 70% or more below the
+  learned floor.
+- **discount** reaches its full 25 at 60% or more off the stated was-price.
+- **heat** reaches its full 20 at twice the source's baseline velocity.
+
 The detail screen renders the category weight as the delta it contributed
-(`subtotal * weight - subtotal`) so the breakdown reads as four additive lines
-that sum to the final score. Worked example, the $60 monitor at weight 1.125:
-outlier 48, discount 22, heat 18, category +11, total 99.
+(`round(subtotal * weight) - subtotal`) so the breakdown reads as four additive
+lines. Where the raw total exceeds 100 the screen shows the score as capped
+rather than silently disagreeing with its own arithmetic.
+
+Worked example, the $60 monitor (floor $198, was $399, twice baseline heat,
+monitors weighted 1.2): outlier 50, discount 25, heat 20, subtotal 95,
+category +19, raw 114, **score 100 (capped)**.
 
 Outlier is the headline signal and the reason the $60 monitor scores 99: the
 learned floor for `monitor:27:1440p:240hz` sits near $198, so $60 is far outside
