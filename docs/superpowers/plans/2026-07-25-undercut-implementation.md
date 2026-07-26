@@ -4577,9 +4577,15 @@ function withReasons(row) {
 
 export async function routeFeed(request, env, url, path) {
   if (path === "/api/feed" && request.method === "GET") {
-    const minScore = parseInt(url.searchParams.get("minScore") ?? "0", 10) || 0;
-    const limit = parseInt(url.searchParams.get("limit") ?? "100", 10) || 100;
-    const rows = await listFeed(env.DB, { minScore, limit: Math.min(limit, LIMITS.maxFeedRows) });
+    // Clamp both, and clamp the low end too. SQLite treats a negative LIMIT as
+    // unbounded, so `?limit=-1` would otherwise return the whole table.
+    const rawMin = parseInt(url.searchParams.get("minScore") ?? "0", 10);
+    const rawLimit = parseInt(url.searchParams.get("limit") ?? "100", 10);
+    const minScore = Number.isFinite(rawMin) ? Math.min(100, Math.max(0, rawMin)) : 0;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.min(rawLimit, LIMITS.maxFeedRows)
+      : 100;
+    const rows = await listFeed(env.DB, { minScore, limit });
     return json({ deals: rows.map(withReasons) });
   }
 
