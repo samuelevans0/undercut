@@ -6,8 +6,8 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 5 done: classify pure classifier (category and reference-price buckets) in src/core/classify.js.
-70 tests green (52 prior + 18 new, including 3 regression tests).
+Task 6 done: fingerprint price-independent deal identity via SHA-256 hash in src/core/fingerprint.js.
+77 tests green (70 prior + 7 new).
 
 ## Task ledger
 - [x] T1 scaffold
@@ -15,7 +15,7 @@ Task 5 done: classify pure classifier (category and reference-price buckets) in 
 - [x] T3 schema + db layer
 - [x] T4 parse-title
 - [x] T5 classify
-- [ ] T6 fingerprint
+- [x] T6 fingerprint
 - [ ] T7 reference prices
 - [ ] T8 score
 - [ ] T9 rules
