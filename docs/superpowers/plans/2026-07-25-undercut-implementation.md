@@ -1182,6 +1182,20 @@ describe("parseTitle price extraction", () => {
     expect(parseTitle("Mouse - $18").priceCents).toBe(1800);
   });
 
+  it("does not truncate a four-digit price written without a comma", () => {
+    // A `\d{1,3}(?:,\d{3})*` leading branch matches just "160" here and never
+    // backtracks, silently reading $1600 as $160. Most GPU prices look like this.
+    expect(parseTitle("RTX 4090 - $1600").priceCents).toBe(160000);
+    expect(parseTitle("Laptop - $1499.99").priceCents).toBe(149999);
+    expect(parseTitle("Server - $12000").priceCents).toBe(1200000);
+  });
+
+  it("reads an uncomma'd was-price at full value too", () => {
+    const r = parseTitle("GPU - $900 ($1600)");
+    expect(r.priceCents).toBe(90000);
+    expect(r.wasPriceCents).toBe(160000);
+  });
+
   it("returns null when there is no price", () => {
     expect(parseTitle("[Monitor] Discussion thread").priceCents).toBe(null);
   });
@@ -1267,7 +1281,19 @@ const MERCHANTS = [
 ];
 
 // A price is a $ followed by digits, optional thousands groups, optional cents.
-const PRICE_RE = /\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)/g;
+//
+// Built fresh per call rather than shared: a /g regex object carries lastIndex,
+// and a stray .test()/.exec() on a shared instance would silently make the next
+// matchAll start mid-string and find nothing.
+//
+// One alternative only, and no {1,3} cap on the leading run. Writing this as
+// `\d{1,3}(?:,\d{3})*|\d+` lets the first branch match just "160" of "$1600"
+// with zero comma groups, and JS alternation never backtracks into the second
+// branch once the first succeeds. That silently truncates every uncomma'd
+// 4-digit price, which is most of the GPU and laptop range.
+function priceRegex() {
+  return /\$\s?(\d+(?:,\d{3})*(?:\.\d{1,2})?)/g;
+}
 
 function toCents(raw) {
   const n = Number(raw.replace(/,/g, ""));
@@ -1296,16 +1322,17 @@ export function parseTitle(rawTitle) {
   const empty = { cleanTitle: "", priceCents: null, wasPriceCents: null, merchant: null, condition: "new" };
   if (!title.trim()) return empty;
 
-  const matches = [...title.matchAll(PRICE_RE)];
+  const matches = [...title.matchAll(priceRegex())];
   const priceCents = matches.length ? toCents(matches[0][1]) : null;
   let wasPriceCents = matches.length > 1 ? toCents(matches[1][1]) : null;
   if (wasPriceCents !== null && priceCents !== null && wasPriceCents <= priceCents) wasPriceCents = null;
 
-  // Clean: drop a leading [Tag], drop everything from the first price onward,
-  // drop bracketed merchant tails, collapse separators.
+  // Clean: drop a leading [Tag], then drop everything from the first price
+  // onward (which also takes any trailing merchant tag with it), and tidy the
+  // separator left dangling on the end.
   let clean = title.replace(/^\s*\[[^\]]*\]\s*/, "");
   if (matches.length) {
-    const firstAt = clean.search(PRICE_RE_FRESH());
+    const firstAt = clean.search(/\$\s?\d/);
     if (firstAt > 0) clean = clean.slice(0, firstAt);
   }
   clean = clean.replace(/[\s\-–|,]+$/, "").replace(/\s{2,}/g, " ").trim();
@@ -1317,11 +1344,6 @@ export function parseTitle(rawTitle) {
     merchant: detectMerchant(title),
     condition: detectCondition(title),
   };
-}
-
-// A fresh regex object each call: PRICE_RE is global and carries lastIndex state.
-function PRICE_RE_FRESH() {
-  return /\$\s?\d/;
 }
 ```
 
