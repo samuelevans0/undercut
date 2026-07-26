@@ -1415,6 +1415,24 @@ describe("classify category", () => {
     expect(classify("Assorted mystery box").category).toBe("unknown");
   });
 
+  it("recognises an Intel part with a suffix letter and no 'Core'", () => {
+    // digit-to-letter is not a word boundary, so `i[3579]-\d{4,5}\b` never
+    // matches "i5-13600K". Titles that omit "Core" hit only this branch.
+    expect(classify("Intel i5-13600K Desktop Processor").category).toBe("cpu");
+    expect(classify("Intel i7-12700KF").category).toBe("cpu");
+    expect(classify("Intel i5-13600").category).toBe("cpu");
+  });
+
+  it("recognises a Radeon card written without the word Radeon", () => {
+    expect(classify("XFX RX 7800 XT").category).toBe("gpu");
+    expect(classify("Sapphire Pulse RX 7800 XT").specKey).toBe("gpu:rx7800xt");
+  });
+
+  it("does not file a motherboard as storage because it mentions M.2 and GB", () => {
+    expect(classify("ASUS ROG Strix motherboard with M.2 slots, 32GB RAM kit").category)
+      .toBe("motherboard");
+  });
+
   it("prefers the tag over inference when they disagree", () => {
     expect(classify("RTX 4070 gaming monitor bundle", { tag: "Monitor" }).category).toBe("monitor");
   });
@@ -1490,16 +1508,30 @@ function inferCategory(t) {
   // the space that follows it, so `\b` can never match there and `27" 1440p`
   // would fail to register as a monitor at all.
   if (/\b\d{2,3}\s?hz\b/i.test(t) && /\b\d{2}(?:"|\s?inch|-inch)/i.test(t)) return "monitor";
+
+  // Motherboards and RAM are checked BEFORE storage on purpose. A board
+  // advertising "M.2 slots" alongside a "32GB" figure satisfies both halves of
+  // the SSD test and would otherwise be filed as a drive.
+  if (/\bmotherboard\b|\bmobo\b/i.test(t)) return "motherboard";
+  if (/\b(ddr[45])\b/i.test(t)) return "ram";
+
   if (/\b(nvme|m\.2|sata)\b/i.test(t) && /\b(ssd|\d+\s?(gb|tb))\b/i.test(t)) return "ssd";
-  if (/\b(rtx|gtx|radeon\s+rx|arc\s+a)\s?\d{3,4}/i.test(t)) return "gpu";
-  if (/\b(ryzen|core\s+i[3579]|i[3579]-\d{4,5})\b/i.test(t)) return "cpu";
+
+  // Bare `rx` as well as `radeon rx`: plenty of titles read "XFX RX 7800 XT"
+  // with no "Radeon" anywhere. The leading \b keeps "TRX40" out.
+  if (/\b(rtx|gtx|radeon\s+rx|rx|arc\s+a)\s?\d{3,4}/i.test(t)) return "gpu";
+
+  // `[a-z]{0,3}` before the boundary. Intel glues a suffix straight onto the
+  // model number ("i5-13600K", "i7-12700KF"), and digit-to-letter is not a word
+  // boundary, so `i[3579]-\d{4,5}\b` never matches a real Intel part. This was
+  // masked by "Core i5" satisfying the middle alternative in tagged titles.
+  if (/\b(?:ryzen|core\s+i[3579]|i[3579]-\d{4,5}[a-z]{0,3})\b/i.test(t)) return "cpu";
+
   if (/\bmouse\b|\bsuperlight\b/i.test(t)) return "mouse";
   if (/\bkeyboard\b|\bkeycaps?\b/i.test(t)) return "keyboard";
   if (/\bheadset\b/i.test(t)) return "headset";
   if (/\bheadphones?\b|\bearbuds?\b|\bspeakers?\b|\bdac\b/i.test(t)) return "audio";
   if (/\bwebcam\b/i.test(t)) return "webcam";
-  if (/\bmotherboard\b/i.test(t)) return "motherboard";
-  if (/\b(ddr[45])\b/i.test(t)) return "ram";
   if (/\bpsu\b|\bpower supply\b/i.test(t)) return "psu";
   if (/\b(aio|air cooler|cpu cooler)\b/i.test(t)) return "cooler";
   return "unknown";
