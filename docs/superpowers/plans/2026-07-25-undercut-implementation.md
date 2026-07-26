@@ -24,6 +24,10 @@
 - **No em-dashes in user-facing copy.** Samuel treats them as an AI tell.
 - **Never add AI co-author trailers to commits.**
 - Commit messages use conventional prefixes (`feat:`, `test:`, `fix:`, `chore:`).
+- **The verbatim test code in each task is authoritative, not the "Expected: PASS,
+  N tests" line beneath it.** Those counts are the plan author's estimate and some
+  are off by a few. Write the tests as given and report the real number. Never pad
+  or trim tests to match a stated count.
 
 ## File Structure
 
@@ -551,12 +555,12 @@ export async function verifyPollRequest(
 - [ ] **Step 7: Run the test to verify it passes**
 
 Run: `npx vitest run tests/lib.test.js`
-Expected: PASS, 15 tests.
+Expected: PASS, 13 tests.
 
 - [ ] **Step 8: Run the whole suite**
 
 Run: `npx vitest run`
-Expected: PASS, 18 tests total.
+Expected: PASS, 16 tests total.
 
 - [ ] **Step 9: Update `docs/PROGRESS.md`** (tick T2, note the suite count) **and commit**
 
