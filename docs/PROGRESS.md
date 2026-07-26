@@ -6,14 +6,14 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 3 done: D1 schema (sources/deals/deal_events/reference_prices/watchlist/rules/prefs/push_subscriptions/notifications)
-plus src/db/sources.js, src/db/deals.js, src/db/prefs.js. 34 tests green (16 prior + 18 new).
+Task 4 done: parseTitle pure parser (price, was-price, merchant, condition) in src/core/parse-title.js.
+52 tests green (34 prior + 18 new, including 2 regression tests for uncomma'd multi-digit prices).
 
 ## Task ledger
 - [x] T1 scaffold
 - [x] T2 vendored libs
 - [x] T3 schema + db layer
-- [ ] T4 parse-title
+- [x] T4 parse-title
 - [ ] T5 classify
 - [ ] T6 fingerprint
 - [ ] T7 reference prices

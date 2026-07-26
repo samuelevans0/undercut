@@ -14,6 +14,20 @@ describe("parseTitle price extraction", () => {
     expect(parseTitle("Mouse - $18").priceCents).toBe(1800);
   });
 
+  it("does not truncate a four-digit price written without a comma", () => {
+    // A `\d{1,3}(?:,\d{3})*` leading branch matches just "160" here and never
+    // backtracks, silently reading $1600 as $160. Most GPU prices look like this.
+    expect(parseTitle("RTX 4090 - $1600").priceCents).toBe(160000);
+    expect(parseTitle("Laptop - $1499.99").priceCents).toBe(149999);
+    expect(parseTitle("Server - $12000").priceCents).toBe(1200000);
+  });
+
+  it("reads an uncomma'd was-price at full value too", () => {
+    const r = parseTitle("GPU - $900 ($1600)");
+    expect(r.priceCents).toBe(90000);
+    expect(r.wasPriceCents).toBe(160000);
+  });
+
   it("returns null when there is no price", () => {
     expect(parseTitle("[Monitor] Discussion thread").priceCents).toBe(null);
   });

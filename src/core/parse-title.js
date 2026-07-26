@@ -6,7 +6,19 @@ const MERCHANTS = [
 ];
 
 // A price is a $ followed by digits, optional thousands groups, optional cents.
-const PRICE_RE = /\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)/g;
+//
+// Built fresh per call rather than shared: a /g regex object carries lastIndex,
+// and a stray .test()/.exec() on a shared instance would silently make the next
+// matchAll start mid-string and find nothing.
+//
+// One alternative only, and no {1,3} cap on the leading run. Writing this as
+// `\d{1,3}(?:,\d{3})*|\d+` lets the first branch match just "160" of "$1600"
+// with zero comma groups, and JS alternation never backtracks into the second
+// branch once the first succeeds. That silently truncates every uncomma'd
+// 4-digit price, which is most of the GPU and laptop range.
+function priceRegex() {
+  return /\$\s?(\d+(?:,\d{3})*(?:\.\d{1,2})?)/g;
+}
 
 function toCents(raw) {
   const n = Number(raw.replace(/,/g, ""));
@@ -35,16 +47,17 @@ export function parseTitle(rawTitle) {
   const empty = { cleanTitle: "", priceCents: null, wasPriceCents: null, merchant: null, condition: "new" };
   if (!title.trim()) return empty;
 
-  const matches = [...title.matchAll(PRICE_RE)];
+  const matches = [...title.matchAll(priceRegex())];
   const priceCents = matches.length ? toCents(matches[0][1]) : null;
   let wasPriceCents = matches.length > 1 ? toCents(matches[1][1]) : null;
   if (wasPriceCents !== null && priceCents !== null && wasPriceCents <= priceCents) wasPriceCents = null;
 
-  // Clean: drop a leading [Tag], drop everything from the first price onward,
-  // drop bracketed merchant tails, collapse separators.
+  // Clean: drop a leading [Tag], then drop everything from the first price
+  // onward (which also takes any trailing merchant tag with it), and tidy the
+  // separator left dangling on the end.
   let clean = title.replace(/^\s*\[[^\]]*\]\s*/, "");
   if (matches.length) {
-    const firstAt = clean.search(PRICE_RE_FRESH());
+    const firstAt = clean.search(/\$\s?\d/);
     if (firstAt > 0) clean = clean.slice(0, firstAt);
   }
   clean = clean.replace(/[\s\-–|,]+$/, "").replace(/\s{2,}/g, " ").trim();
@@ -56,9 +69,4 @@ export function parseTitle(rawTitle) {
     merchant: detectMerchant(title),
     condition: detectCondition(title),
   };
-}
-
-// A fresh regex object each call: PRICE_RE is global and carries lastIndex state.
-function PRICE_RE_FRESH() {
-  return /\$\s?\d/;
 }
