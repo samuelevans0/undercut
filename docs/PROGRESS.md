@@ -6,9 +6,9 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 7 done: cold-start seed + gradually-learned reference prices in
-src/core/reference.js (pure) and src/db/refs.js (D1).
-94 tests green (77 prior + 17 new).
+Task 8 done: pure scoring engine with outlier, discount, and heat components in
+src/core/score.js.
+117 tests green (94 prior + 23 new).
 
 ## Task ledger
 - [x] T1 scaffold
@@ -18,7 +18,7 @@ src/core/reference.js (pure) and src/db/refs.js (D1).
 - [x] T5 classify
 - [x] T6 fingerprint
 - [x] T7 reference prices
-- [ ] T8 score
+- [x] T8 score
 - [ ] T9 rules
 - [ ] T10 reddit source
 - [ ] T11 rss sources (slickdeals, woot)
