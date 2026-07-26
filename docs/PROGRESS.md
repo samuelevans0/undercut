@@ -7,7 +7,7 @@ Read this file first when resuming. Update it at the end of every task.
 
 ## Status
 Task 5 done: classify pure classifier (category and reference-price buckets) in src/core/classify.js.
-67 tests green (52 prior + 15 new).
+70 tests green (52 prior + 18 new, including 3 regression tests).
 
 ## Task ledger
 - [x] T1 scaffold

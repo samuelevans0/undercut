@@ -35,6 +35,24 @@ describe("classify category", () => {
     expect(classify("Assorted mystery box").category).toBe("unknown");
   });
 
+  it("recognises an Intel part with a suffix letter and no 'Core'", () => {
+    // digit-to-letter is not a word boundary, so `i[3579]-\d{4,5}\b` never
+    // matches "i5-13600K". Titles that omit "Core" hit only this branch.
+    expect(classify("Intel i5-13600K Desktop Processor").category).toBe("cpu");
+    expect(classify("Intel i7-12700KF").category).toBe("cpu");
+    expect(classify("Intel i5-13600").category).toBe("cpu");
+  });
+
+  it("recognises a Radeon card written without the word Radeon", () => {
+    expect(classify("XFX RX 7800 XT").category).toBe("gpu");
+    expect(classify("Sapphire Pulse RX 7800 XT").specKey).toBe("gpu:rx7800xt");
+  });
+
+  it("does not file a motherboard as storage because it mentions M.2 and GB", () => {
+    expect(classify("ASUS ROG Strix motherboard with M.2 slots, 32GB RAM kit").category)
+      .toBe("motherboard");
+  });
+
   it("prefers the tag over inference when they disagree", () => {
     expect(classify("RTX 4070 gaming monitor bundle", { tag: "Monitor" }).category).toBe("monitor");
   });
