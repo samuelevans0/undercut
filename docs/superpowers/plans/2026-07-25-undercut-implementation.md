@@ -1981,7 +1981,7 @@ export async function updateLearned(db, specKey, category, pricesCents, seedJson
 Run: `npx vitest run tests/reference.test.js`
 Expected: PASS, 17 tests.
 
-- [ ] **Step 7: Update `docs/PROGRESS.md` and commit**
+- [ ] **Step 6: Update `docs/PROGRESS.md` and commit**
 
 ```bash
 git add -A
@@ -2625,11 +2625,16 @@ Reddit application-only OAuth: POST `https://www.reddit.com/api/v1/access_token`
 `tests/source-reddit.test.js`:
 
 ```js
-import { describe, it, expect, vi } from "vitest";
-import { redditAdapter } from "../src/sources/reddit.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { redditAdapter, _resetTokenCache } from "../src/sources/reddit.js";
 import fixture from "./fixtures/reddit-buildapcsales.json";
 
 const env = { REDDIT_CLIENT_ID: "id", REDDIT_CLIENT_SECRET: "secret" };
+
+// The token cache is module scope, so it survives between tests in this file.
+// Without this, whichever test runs second sees a warm token and the
+// "sends basic auth to the token endpoint" assertion finds no token call.
+beforeEach(() => _resetTokenCache());
 
 function fakeFetch(handlers) {
   return vi.fn(async (url, init) => {
@@ -2808,25 +2813,12 @@ export const redditAdapter = {
 };
 ```
 
-- [ ] **Step 5: Reset the token cache between tests**
-
-Add to the top of `tests/source-reddit.test.js`, after the imports:
-
-```js
-import { _resetTokenCache } from "../src/sources/reddit.js";
-import { beforeEach } from "vitest";
-
-beforeEach(() => _resetTokenCache());
-```
-
-Then change the cached-token test so it is the only one relying on cache persistence within a single call sequence. It already is, because it makes two `list` calls in one test.
-
-- [ ] **Step 6: Run the test to verify it passes**
+- [ ] **Step 5: Run the test to verify it passes**
 
 Run: `npx vitest run tests/source-reddit.test.js`
 Expected: PASS, 11 tests.
 
-- [ ] **Step 7: Update `docs/PROGRESS.md` and commit**
+- [ ] **Step 6: Update `docs/PROGRESS.md` and commit**
 
 ```bash
 git add -A
@@ -3724,7 +3716,7 @@ export async function notifyDeal(env, deal, payload, nowSec, sendImpl = sendPush
 Run: `npx vitest run tests/notify.test.js`
 Expected: PASS, 21 tests.
 
-- [ ] **Step 7: Update `docs/PROGRESS.md` and commit**
+- [ ] **Step 6: Update `docs/PROGRESS.md` and commit**
 
 ```bash
 git add -A
