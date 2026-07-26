@@ -811,6 +811,14 @@ describe("sources", () => {
     expect(s.disabled_at).toBe(NOW);
   });
 
+  it("pushes the retry window forward when an already-disabled source fails again", async () => {
+    for (let i = 0; i < 3; i++) await markFailure(env.DB, "woot", NOW);
+    await markFailure(env.DB, "woot", NOW + 3700);
+    const s = await getSource(env.DB, "woot");
+    expect(s.disabled_at).toBe(NOW + 3700);
+    expect(isDue(s, NOW + 3800)).toBe(false);
+  });
+
   it("clears failures and re-enables on success", async () => {
     for (let i = 0; i < 3; i++) await markFailure(env.DB, "woot", NOW);
     await markSuccess(env.DB, "woot", NOW + 10);
@@ -963,10 +971,11 @@ export async function markFailure(db, id, nowSec, message = "error") {
     .prepare("UPDATE sources SET consecutive_failures = consecutive_failures + 1, last_status = ? WHERE id = ?")
     .bind(String(message).slice(0, 200), id)
     .run();
+  // No `AND enabled = 1` guard here on purpose. An already-disabled source that
+  // fails its hourly retry must push `disabled_at` forward, otherwise the retry
+  // window stays permanently elapsed and a dead source gets polled every minute.
   await db
-    .prepare(
-      "UPDATE sources SET enabled = 0, disabled_at = ? WHERE id = ? AND consecutive_failures >= ? AND enabled = 1"
-    )
+    .prepare("UPDATE sources SET enabled = 0, disabled_at = ? WHERE id = ? AND consecutive_failures >= ?")
     .bind(nowSec, id, LIMITS.sourceFailureThreshold)
     .run();
 }
@@ -1115,7 +1124,7 @@ export async function removePushSub(db, endpoint) {
 - [ ] **Step 9: Run the test to verify it passes**
 
 Run: `npx vitest run tests/db.test.js`
-Expected: PASS, 17 tests.
+Expected: PASS, 18 tests.
 
 - [ ] **Step 10: Run the whole suite, update `docs/PROGRESS.md`, and commit**
 
