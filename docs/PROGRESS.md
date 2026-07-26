@@ -6,11 +6,11 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 1 done: scaffold, config, health route, 3 tests green.
+Task 2 done: vendored crypto/session/webpush from My Email, added hmac-auth poll signing, 16 tests green.
 
 ## Task ledger
 - [x] T1 scaffold
-- [ ] T2 vendored libs
+- [x] T2 vendored libs
 - [ ] T3 schema + db layer
 - [ ] T4 parse-title
 - [ ] T5 classify
@@ -32,7 +32,10 @@ Task 1 done: scaffold, config, health route, 3 tests green.
 - [ ] T21 deploy runbook
 
 ## Gotchas found
-(none yet)
+- Task 2 brief's prose said "15 tests" / "18 tests total" for tests/lib.test.js
+  and the full suite, but the verbatim test code given (which is authoritative)
+  contains 13 `it()` blocks, so the real totals are 13 and 16. Ran the exact
+  code as instructed rather than padding it to hit the stated number.
 
 ## Assumptions to verify (from spec section 17)
 - [ ] Per-source fan-out keeps each poll inside the free-tier CPU allowance
