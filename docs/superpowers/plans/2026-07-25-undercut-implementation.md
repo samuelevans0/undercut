@@ -479,7 +479,12 @@ describe("session", () => {
 
   it("rejects a tampered signature", async () => {
     const setCookie = await createSessionCookie("owner", secret);
-    const value = setCookie.split(";")[0].slice(0, -1) + "0";
+    const original = setCookie.split(";")[0];
+    // Flip the last hex digit to something it definitely is not. Appending a
+    // fixed character would leave the value unchanged whenever the signature
+    // already ended in it, which is a 1-in-16 false pass.
+    const value = original.slice(0, -1) + (original.endsWith("0") ? "1" : "0");
+    expect(value).not.toBe(original);
     expect(await readSession(reqWithCookie(value), secret)).toBe(null);
   });
 
