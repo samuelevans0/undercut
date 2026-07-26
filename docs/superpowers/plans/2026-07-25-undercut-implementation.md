@@ -733,10 +733,12 @@ The pool's `applyD1Migrations` option expects a numbered migrations directory, w
 ```js
 import { env } from "cloudflare:test";
 import { beforeAll } from "vitest";
-import { readFileSync } from "node:fs";
+// Vite `?raw` import, NOT node:fs. `setupFiles` runs inside the workerd
+// sandbox, which has no host disk access, so readFileSync cannot reach
+// schema.sql however the path is spelled. Vite inlines this at build time.
+import sql from "../schema.sql?raw";
 
 beforeAll(async () => {
-  const sql = readFileSync(new URL("../schema.sql", import.meta.url), "utf8");
   for (const stmt of sql.split(";")) {
     const trimmed = stmt.trim();
     if (trimmed) await env.DB.prepare(trimmed).run();
