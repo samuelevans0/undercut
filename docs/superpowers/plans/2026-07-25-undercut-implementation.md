@@ -1486,7 +1486,10 @@ const RESOLUTIONS = [
 ];
 
 function inferCategory(t) {
-  if (/\b\d{2,3}\s?hz\b/i.test(t) && /\b\d{2}("|\s?inch|-inch)\b/i.test(t)) return "monitor";
+  // No trailing \b after the size unit. A `"` is a non-word character and so is
+  // the space that follows it, so `\b` can never match there and `27" 1440p`
+  // would fail to register as a monitor at all.
+  if (/\b\d{2,3}\s?hz\b/i.test(t) && /\b\d{2}(?:"|\s?inch|-inch)/i.test(t)) return "monitor";
   if (/\b(nvme|m\.2|sata)\b/i.test(t) && /\b(ssd|\d+\s?(gb|tb))\b/i.test(t)) return "ssd";
   if (/\b(rtx|gtx|radeon\s+rx|arc\s+a)\s?\d{3,4}/i.test(t)) return "gpu";
   if (/\b(ryzen|core\s+i[3579]|i[3579]-\d{4,5})\b/i.test(t)) return "cpu";
