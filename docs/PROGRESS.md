@@ -6,8 +6,9 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 6 done: fingerprint price-independent deal identity via SHA-256 hash in src/core/fingerprint.js.
-77 tests green (70 prior + 7 new).
+Task 7 done: cold-start seed + gradually-learned reference prices in
+src/core/reference.js (pure) and src/db/refs.js (D1).
+94 tests green (77 prior + 17 new).
 
 ## Task ledger
 - [x] T1 scaffold
@@ -16,7 +17,7 @@ Task 6 done: fingerprint price-independent deal identity via SHA-256 hash in src
 - [x] T4 parse-title
 - [x] T5 classify
 - [x] T6 fingerprint
-- [ ] T7 reference prices
+- [x] T7 reference prices
 - [ ] T8 score
 - [ ] T9 rules
 - [ ] T10 reddit source

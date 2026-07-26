@@ -1,0 +1,25 @@
+{
+  "monitor:24:1080p:144hz": { "category": "monitor", "typicalCents": 12000, "floorCents": 8000 },
+  "monitor:24:1080p:165hz": { "category": "monitor", "typicalCents": 13000, "floorCents": 9000 },
+  "monitor:27:1080p:144hz": { "category": "monitor", "typicalCents": 14000, "floorCents": 9500 },
+  "monitor:27:1440p:144hz": { "category": "monitor", "typicalCents": 22000, "floorCents": 16000 },
+  "monitor:27:1440p:165hz": { "category": "monitor", "typicalCents": 23000, "floorCents": 17000 },
+  "monitor:27:1440p:180hz": { "category": "monitor", "typicalCents": 24000, "floorCents": 18000 },
+  "monitor:27:1440p:240hz": { "category": "monitor", "typicalCents": 32000, "floorCents": 19800 },
+  "monitor:27:4k:144hz":    { "category": "monitor", "typicalCents": 45000, "floorCents": 33000 },
+  "monitor:32:1440p:165hz": { "category": "monitor", "typicalCents": 28000, "floorCents": 20000 },
+  "monitor:32:4k:144hz":    { "category": "monitor", "typicalCents": 55000, "floorCents": 38000 },
+  "monitor:34:1440p:180hz": { "category": "monitor", "typicalCents": 45000, "floorCents": 30000 },
+
+  "ssd:nvme:1tb": { "category": "ssd", "typicalCents": 7000,  "floorCents": 4500 },
+  "ssd:nvme:2tb": { "category": "ssd", "typicalCents": 13000, "floorCents": 8500 },
+  "ssd:nvme:4tb": { "category": "ssd", "typicalCents": 26000, "floorCents": 18000 },
+  "ssd:sata:1tb": { "category": "ssd", "typicalCents": 6000,  "floorCents": 4000 },
+  "ssd:sata:2tb": { "category": "ssd", "typicalCents": 11000, "floorCents": 7500 },
+
+  "gpu:rtx4060":      { "category": "gpu", "typicalCents": 29000, "floorCents": 24000 },
+  "gpu:rtx4060ti":    { "category": "gpu", "typicalCents": 37000, "floorCents": 31000 },
+  "gpu:rtx4070":      { "category": "gpu", "typicalCents": 52000, "floorCents": 44000 },
+  "gpu:rtx4070super": { "category": "gpu", "typicalCents": 59000, "floorCents": 49000 },
+  "gpu:rx7800xt":     { "category": "gpu", "typicalCents": 47000, "floorCents": 40000 }
+}
