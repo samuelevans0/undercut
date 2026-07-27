@@ -1,0 +1,46 @@
+{
+  "kind": "Listing",
+  "data": {
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "abc123",
+          "title": "[Monitor] LG 27GR83Q 27\" 1440p 240Hz IPS - $60 (was $399)",
+          "url": "https://www.amazon.com/dp/B0EXAMPLE",
+          "permalink": "/r/buildapcsales/comments/abc123/monitor_lg/",
+          "created_utc": 1800000000,
+          "ups": 340,
+          "num_comments": 41,
+          "link_flair_text": "Monitor"
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "def456",
+          "title": "[SSD] Samsung 990 Pro 2TB NVMe - $52 ($169)",
+          "url": "https://www.newegg.com/p/EXAMPLE",
+          "permalink": "/r/buildapcsales/comments/def456/ssd_samsung/",
+          "created_utc": 1799999400,
+          "ups": 88,
+          "num_comments": 12,
+          "link_flair_text": "SSD"
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "ghi789",
+          "title": "[Meta] Subreddit rules reminder",
+          "url": "https://www.reddit.com/r/buildapcsales/comments/ghi789/meta/",
+          "permalink": "/r/buildapcsales/comments/ghi789/meta/",
+          "created_utc": 1799990000,
+          "ups": 12,
+          "num_comments": 3,
+          "link_flair_text": "Meta"
+        }
+      }
+    ]
+  }
+}
