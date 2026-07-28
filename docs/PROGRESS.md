@@ -6,10 +6,10 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 10 done: Reddit source adapter in src/sources/reddit.js.
-152 tests green (139 prior + 11 new + 2 regression fixes from review round 1:
-a 200 OK listing with no children array now throws instead of silently
-returning [], and non-t3 children like "more" stubs are skipped).
+Task 11 done: hand-rolled RSS reader (src/sources/rss.js) plus Slickdeals and
+Woot adapters. 167 tests green (152 prior + 15 new: 7 parseRss + 5
+slickdealsAdapter + 3 wootAdapter; the brief's "13 tests" estimate undercounted
+the verbatim test code, which is authoritative).
 
 ## Task ledger
 - [x] T1 scaffold
@@ -22,7 +22,7 @@ returning [], and non-t3 children like "more" stubs are skipped).
 - [x] T8 score
 - [x] T9 rules
 - [x] T10 reddit source
-- [ ] T11 rss sources (slickdeals, woot)
+- [x] T11 rss sources (slickdeals, woot)
 - [ ] T12 ebay source
 - [ ] T13 notify
 - [ ] T14 poll pipeline
@@ -55,6 +55,17 @@ returning [], and non-t3 children like "more" stubs are skipped).
   fix to the test-harness plumbing, not the "per-test table creation" workaround
   the brief warned against — schema application still happens once in a single
   `beforeAll`, unchanged in spirit.
+- Task 11: the same virtualized-`node:fs` issue from Task 3 recurs, this time
+  inside the verbatim test file itself rather than a separate setup file.
+  `tests/source-rss.test.js`'s brief code loads fixtures with
+  `readFileSync(new URL("./fixtures/slickdeals.xml", import.meta.url), "utf8")`;
+  that throws `no such file or directory` for the same reason as Task 3 (no
+  real host disk access inside the workerd/Miniflare sandbox). Fixed the same
+  way: swapped the two loader lines to Vite's `?raw` import suffix
+  (`import slickXml from "./fixtures/slickdeals.xml?raw"`). Every `describe`/
+  `it` block is unmodified from the brief. Verified 15 tests pass (7 parseRss
+  + 5 slickdealsAdapter + 3 wootAdapter), not the "13 tests" the brief's prose
+  estimated.
 
 ## Assumptions to verify (from spec section 17)
 - [ ] Per-source fan-out keeps each poll inside the free-tier CPU allowance
