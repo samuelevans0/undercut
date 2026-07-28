@@ -6,6 +6,44 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 14 done: the poll pipeline. `src/poll.js` wires fetch, parse, classify,
+fingerprint, upsert/appendEvent, getReference, scoreDeal, evaluateRules,
+shouldNotify/notifyDeal, and end-of-tick learned-reference refresh into one
+`pollSource(env, sourceId, nowSec, deps)` call; `src/api/poll.js` exposes it
+as `POST /api/poll/:sourceId`, HMAC-verified, registered in `src/index.js`
+outside any origin/session gate (neither exists yet; that's T15's job, but
+`routePoll` is already positioned to sit outside them). Items with no
+parseable price are skipped before classify/fingerprint/upsert ever run, so
+junk never reaches the deals table. `adapter.list` is the only wrapped call;
+on throw it records `markFailure` and returns `status: "failed"` without
+propagating, and `markPolled` is called before the fetch so a throwing source
+still consumes its interval instead of being retried every tick. 224 tests
+green (206 prior + 18 new: 13 pollSource + 5 route; the brief's "18 tests"
+estimate was correct this time).
+
+Two test-infra/implementation fixes were needed beyond the brief's verbatim
+code:
+1. `vitest.config.js` had no `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`
+   bindings. T10's own test file sidesteps this by constructing a plain `env`
+   object by hand; T14 is the first test to call `pollSource` against the
+   real `cloudflare:test` `env`, which reaches the reddit adapter's
+   credential check. Added fake test bindings alongside the existing
+   `SESSION_SECRET`/`POLL_SECRET`/VAPID ones.
+2. Genuine bug in `poll.js`'s own `heatFor` (new code this task, not a
+   frozen module): `Math.max(1, ageMin)` was written to dodge divide-by-zero
+   for a post whose age is exactly 0, but it doesn't just dodge the crash, it
+   manufactures a rate (votes ÷ 1 minute) from a genuinely zero-length
+   window. The shared reddit fixture's `created_utc` happens to equal this
+   task's `NOW` exactly (a T10 fixture coincidentally reused by a T14 test
+   constant), so the monitor item's heat maxed out, pushing its score to a
+   capped 100 and making it independently clear a `threshold: 100` meant to
+   be reachable only via a watchlist force-notify (T13's `shouldNotify`
+   already fires exactly at the threshold, by design, so this wasn't a bug
+   there). Fixed by gating on minimum elapsed time (`ageSec < 60 -> null`,
+   which `scoreDeal` already tolerates) instead of flooring the denominator.
+   All other tests, including the ">= 90" outlier-score assertion, still
+   pass with heat suppressed for that specific zero-age item.
+
 Task 13 done: notification decision, copy, and delivery. `src/core/notify-decision.js`
 (pure) holds `shouldNotify` (already-notified check first, price-drop the only
 escape) and `buildNotification` (anomaly-first copy: unprecedented-price fact
@@ -47,7 +85,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T11 rss sources (slickdeals, woot)
 - [x] T12 ebay source
 - [x] T13 notify
-- [ ] T14 poll pipeline
+- [x] T14 poll pipeline
 - [ ] T15 auth api
 - [ ] T16 read api
 - [ ] T17 feed + detail UI
@@ -94,7 +132,24 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
   entirely; no test-harness workaround was needed here. Verified 15 tests pass
   (12 ebayAdapter + 3 adapter registry), not the "14 tests" the brief's prose
   estimated.
+- Task 14: `vitest.config.js` needed `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`
+  test bindings added (see Status above) because this is the first test to
+  drive the reddit adapter through the real `cloudflare:test` `env` rather
+  than a hand-built stand-in. Also found and fixed a genuine bug in `poll.js`'s
+  own `heatFor`: flooring the age denominator to 1 minute for a zero-age post
+  manufactures a fake velocity instead of signalling "no data yet"; fixed by
+  gating on elapsed time instead (see Status above for the full story).
 
 ## Assumptions to verify (from spec section 17)
-- [ ] Per-source fan-out keeps each poll inside the free-tier CPU allowance
+- [ ] Per-source fan-out keeps each poll inside the free-tier CPU allowance.
+      T14 note: a fully-stored 50-item tick makes roughly 300-450 D1 calls —
+      ~6 per stored item (upsertDeal's own SELECT-then-INSERT/UPDATE, plus
+      appendEvent, getReference, setScore, getDeal), a few more per item that
+      clears the notify bar (listPushSubs, one notifications INSERT per push
+      subscription, markNotified), ~2 per distinct spec bucket touched this
+      tick (refreshLearned's SELECT + updateLearned's write), and ~6 fixed
+      per-tick calls (getSource, markPolled, getPrefs, listWatchlist,
+      listRules, markSuccess). Skipped (unparseable-price) items cost zero DB
+      calls. Not optimised per the brief; flagged for the deploy task to
+      measure against the actual free-tier CPU/subrequest budget.
 - [ ] Reddit requires OAuth from Cloudflare datacenter IPs

@@ -1,6 +1,7 @@
 import { json, HttpError } from "./lib/http.js";
+import { routePoll } from "./api/poll.js";
 
-const routers = [];
+const routers = [routePoll];
 
 async function handleApi(request, env, url, path) {
   if (path === "/api/health") return json({ ok: true });

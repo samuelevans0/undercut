@@ -13,6 +13,8 @@ export default defineConfig({
           VAPID_PUBLIC_KEY: "test-vapid-public",
           VAPID_PRIVATE_KEY: "{}",
           VAPID_SUBJECT: "mailto:push@undercut.test",
+          REDDIT_CLIENT_ID: "test-reddit-id",
+          REDDIT_CLIENT_SECRET: "test-reddit-secret",
         },
       },
     }),
