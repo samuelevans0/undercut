@@ -66,7 +66,12 @@ export const ebayAdapter = {
     const queries = Array.isArray(config.queries) ? config.queries.filter(Boolean) : [];
     if (!queries.length) return [];
 
-    const cursor = Number.isFinite(config.cursor) ? config.cursor : 0;
+    // isInteger and >= 0, not isFinite. A negative cursor gives a negative
+    // modulo in JS (-1 % 3 is -1, not 2) and a fractional one misses every
+    // array index, so `queries[cursor % len]` would be undefined and we would
+    // spend one of the day's 288 searches looking up the literal word
+    // "undefined" with nothing to show for it.
+    const cursor = Number.isInteger(config.cursor) && config.cursor >= 0 ? config.cursor : 0;
     const query = queries[cursor % queries.length];
 
     const token = await getToken(env, fetchImpl);

@@ -9,9 +9,14 @@ Read this file first when resuming. Update it at the end of every task.
 Task 12 done: eBay Browse API adapter (src/sources/ebay.js) with OAuth
 client-credentials token caching and one-query-per-poll rotation by
 `config.cursor`, plus the source registry (src/sources/index.js: `ADAPTERS`,
-`getAdapter`). 182 tests green (167 prior + 15 new: 12 ebayAdapter + 3
-adapter registry; the brief's "14 tests" estimate undercounted the verbatim
-test code, which is authoritative).
+`getAdapter`). 183 tests green (167 prior + 15 new + 1 review-round-1 fix:
+12 ebayAdapter + 3 adapter registry + 1 cursor-guard regression test; the
+brief's "14 tests" estimate undercounted the verbatim test code, which is
+authoritative). Review round 1 fixed a cursor-guard bug in the brief's own
+code: `Number.isFinite` let negative or fractional cursors through, and a
+negative modulo or fractional array index resolved to `undefined`, silently
+burning one of the day's 288 searches on the literal string "undefined".
+Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 
 ## Task ledger
 - [x] T1 scaffold

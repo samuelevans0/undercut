@@ -68,6 +68,18 @@ describe("ebayAdapter", () => {
     expect(String(search[0])).toContain("beta");
   });
 
+  it("falls back to the first query for a nonsense cursor", async () => {
+    // A negative modulo or a fractional index yields undefined, and we would
+    // silently spend a search on the literal string "undefined".
+    for (const cursor of [-1, 2.5, NaN, "3", null, undefined]) {
+      const f = fakeFetch([tokenOk, searchOk]);
+      await ebayAdapter.list(env, { queries: ["alpha", "beta"], cursor }, f);
+      const search = f.mock.calls.find((c) => String(c[0]).includes("item_summary/search"));
+      expect(String(search[0])).toContain("alpha");
+      expect(String(search[0])).not.toContain("undefined");
+    }
+  });
+
   it("returns nothing when there are no queries", async () => {
     const f = fakeFetch([tokenOk, searchOk]);
     expect(await ebayAdapter.list(env, { queries: [] }, f)).toEqual([]);
