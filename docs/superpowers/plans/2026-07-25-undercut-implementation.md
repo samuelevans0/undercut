@@ -2919,13 +2919,15 @@ There is no XML parser in Workers, and adding a dependency is forbidden by the g
 
 ```js
 import { describe, it, expect, vi } from "vitest";
-import { readFileSync } from "node:fs";
 import { parseRss } from "../src/sources/rss.js";
 import { slickdealsAdapter } from "../src/sources/slickdeals.js";
 import { wootAdapter } from "../src/sources/woot.js";
-
-const slickXml = readFileSync(new URL("./fixtures/slickdeals.xml", import.meta.url), "utf8");
-const wootXml = readFileSync(new URL("./fixtures/woot.xml", import.meta.url), "utf8");
+// Vite `?raw` import, NOT node:fs. Every test file runs inside the workerd
+// sandbox, which has no host disk access, so readFileSync cannot reach the
+// fixture however the path is spelled (same issue as Task 3's setup.js).
+// Vite inlines this at build time instead.
+import slickXml from "./fixtures/slickdeals.xml?raw";
+import wootXml from "./fixtures/woot.xml?raw";
 
 const okWith = (body) => vi.fn(async () => new Response(body, { status: 200 }));
 
