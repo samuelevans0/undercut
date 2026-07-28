@@ -3280,6 +3280,18 @@ describe("ebayAdapter", () => {
     expect(String(search[0])).toContain("beta");
   });
 
+  it("falls back to the first query for a nonsense cursor", async () => {
+    // A negative modulo or a fractional index yields undefined, and we would
+    // silently spend a search on the literal string "undefined".
+    for (const cursor of [-1, 2.5, NaN, "3", null, undefined]) {
+      const f = fakeFetch([tokenOk, searchOk]);
+      await ebayAdapter.list(env, { queries: ["alpha", "beta"], cursor }, f);
+      const search = f.mock.calls.find((c) => String(c[0]).includes("item_summary/search"));
+      expect(String(search[0])).toContain("alpha");
+      expect(String(search[0])).not.toContain("undefined");
+    }
+  });
+
   it("returns nothing when there are no queries", async () => {
     const f = fakeFetch([tokenOk, searchOk]);
     expect(await ebayAdapter.list(env, { queries: [] }, f)).toEqual([]);
@@ -3402,7 +3414,12 @@ export const ebayAdapter = {
     const queries = Array.isArray(config.queries) ? config.queries.filter(Boolean) : [];
     if (!queries.length) return [];
 
-    const cursor = Number.isFinite(config.cursor) ? config.cursor : 0;
+    // isInteger and >= 0, not isFinite. A negative cursor gives a negative
+    // modulo in JS (-1 % 3 is -1, not 2) and a fractional one misses every
+    // array index, so `queries[cursor % len]` would be undefined and we would
+    // spend one of the day's 288 searches looking up the literal word
+    // "undefined" with nothing to show for it.
+    const cursor = Number.isInteger(config.cursor) && config.cursor >= 0 ? config.cursor : 0;
     const query = queries[cursor % queries.length];
 
     const token = await getToken(env, fetchImpl);
