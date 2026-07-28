@@ -65,8 +65,20 @@ export const redditAdapter = {
       });
       if (!res.ok) throw new Error(`reddit listing failed for ${sub}: ${res.status}`);
       const data = await res.json();
-      for (const child of data?.data?.children ?? []) {
-        if (child?.data) items.push(toRawItem(child.data));
+
+      // A 200 with no children array is NOT an empty day. Reddit answers 200
+      // with `{"reason":"private"}` for private, quarantined and banned
+      // subreddits, and `?? []` would turn that into a silent zero-result poll
+      // that looks identical to nothing being posted. Throw so source health
+      // records it and the source eventually disables itself loudly.
+      const children = data?.data?.children;
+      if (!Array.isArray(children)) {
+        throw new Error(`reddit listing for ${sub} returned no children array (private, banned, or shape changed)`);
+      }
+
+      for (const child of children) {
+        // Skip "more" stubs and anything that is not a link post.
+        if (child?.kind === "t3" && child.data) items.push(toRawItem(child.data));
       }
     }
     return items;

@@ -7,7 +7,9 @@ Read this file first when resuming. Update it at the end of every task.
 
 ## Status
 Task 10 done: Reddit source adapter in src/sources/reddit.js.
-150 tests green (139 prior + 11 new).
+152 tests green (139 prior + 11 new + 2 regression fixes from review round 1:
+a 200 OK listing with no children array now throws instead of silently
+returning [], and non-t3 children like "more" stubs are skipped).
 
 ## Task ledger
 - [x] T1 scaffold

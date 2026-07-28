@@ -92,6 +92,22 @@ describe("redditAdapter", () => {
     await expect(redditAdapter.list(env, { subreddits: ["a"] }, f)).rejects.toThrow(/429/);
   });
 
+  it("throws on a 200 that carries no children array", async () => {
+    // Reddit answers 200 with {"reason":"private"} for private/banned subs.
+    // Returning [] here would look exactly like a quiet day.
+    const f = fakeFetch([tokenOk, ["oauth", async () => Response.json({ reason: "private" })]]);
+    await expect(redditAdapter.list(env, { subreddits: ["a"] }, f)).rejects.toThrow(/children/i);
+  });
+
+  it("skips non-post children rather than emitting a degenerate item", async () => {
+    const custom = structuredClone(fixture);
+    custom.data.children.push({ kind: "more", data: { count: 12 } });
+    const f = fakeFetch([tokenOk, ["oauth", async () => Response.json(custom)]]);
+    const items = await redditAdapter.list(env, { subreddits: ["a"] }, f);
+    expect(items).toHaveLength(3);
+    expect(items.every((i) => !i.externalId.includes("undefined"))).toBe(true);
+  });
+
   it("defaults to buildapcsales with no config", async () => {
     const f = fakeFetch([tokenOk, listingOk]);
     await redditAdapter.list(env, {}, f);
