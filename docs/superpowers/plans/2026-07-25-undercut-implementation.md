@@ -2985,6 +2985,19 @@ describe("slickdealsAdapter", () => {
     const f = vi.fn(async () => new Response("err", { status: 503 }));
     await expect(slickdealsAdapter.list({}, {}, f)).rejects.toThrow(/503/);
   });
+
+  it("throws when a 200 response is not a feed at all", async () => {
+    // Bot challenge and error pages come back 200 with HTML. Parsing that to
+    // zero items would look exactly like a quiet feed.
+    const f = vi.fn(async () => new Response("<!doctype html><html><body>Access denied</body></html>", { status: 200 }));
+    await expect(slickdealsAdapter.list({}, {}, f)).rejects.toThrow(/did not return RSS/i);
+  });
+
+  it("allows a valid feed that genuinely has no items", async () => {
+    const quiet = '<?xml version="1.0"?><rss version="2.0"><channel><title>Quiet</title></channel></rss>';
+    const f = vi.fn(async () => new Response(quiet, { status: 200 }));
+    await expect(slickdealsAdapter.list({}, {}, f)).resolves.toEqual([]);
+  });
 });
 
 describe("wootAdapter", () => {
@@ -3077,7 +3090,21 @@ export function rssItemToRaw(item) {
 export async function fetchFeed(url, fetchImpl) {
   const res = await fetchImpl(url, { headers: { "user-agent": "undercut/1.0 (private deal watcher)" } });
   if (!res.ok) throw new Error(`feed fetch failed for ${url}: ${res.status}`);
-  return parseRss(await res.text());
+  const text = await res.text();
+
+  // A 200 is not proof we got a feed. Slickdeals and Woot both answer 200 with
+  // an HTML error or bot-challenge page when they are unhappy, and parseRss
+  // would quietly turn that into zero items, which is indistinguishable from a
+  // quiet feed. Insist on an RSS-shaped root before parsing.
+  //
+  // Note the deliberate asymmetry with the Reddit adapter: zero `<item>`
+  // elements INSIDE a valid RSS document is a legitimately quiet feed and stays
+  // allowed. Only a non-feed response is an error.
+  if (!/<(rss|feed|channel)\b/i.test(text)) {
+    const head = text.slice(0, 60).replace(/\s+/g, " ").trim();
+    throw new Error(`feed at ${url} did not return RSS (got: ${head})`);
+  }
+  return parseRss(text);
 }
 ```
 
