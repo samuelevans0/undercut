@@ -3836,6 +3836,14 @@ git commit -m "feat: add notification decision, anomaly-first copy, and delivery
 
 Pipeline order per item: parse, classify, fingerprint, upsert, append event, load reference, score, store score, evaluate rules, decide, notify. Items with no parseable price are skipped, not stored.
 
+Note: `vitest.config.js`'s miniflare `bindings` (Task 1) do not include
+`REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`. Task 10's own test builds a plain
+`env` object by hand, so it never needed them, but this task's test calls
+`pollSource` against the real `cloudflare:test` `env`, which the reddit
+adapter's credential check reaches. Add fake test values for both alongside
+the existing `SESSION_SECRET`/`POLL_SECRET`/VAPID bindings before running
+this task's tests.
+
 - [ ] **Step 1: Write the failing test**
 
 `tests/poll.test.js`:
@@ -4058,7 +4066,19 @@ const SOURCE_LABELS = {
 function heatFor(sourceId, item, nowSec) {
   const baseline = SOURCE_HEAT_BASELINE[sourceId] ?? 0;
   if (!baseline || item.upvotes === null) return null;
-  const ageMin = Math.max(1, (nowSec - (item.postedAt ?? nowSec)) / 60);
+  const ageSec = nowSec - (item.postedAt ?? nowSec);
+  // A post under a minute old has no meaningful velocity yet: flooring the age
+  // denominator to 1 minute (the original approach) doesn't just dodge
+  // divide-by-zero, it manufactures a rate from a near-zero window, which reads
+  // as instant virality for any post that is merely fresh. The shared reddit
+  // fixture's created_utc happens to equal this task's own NOW test constant,
+  // so this was not a theoretical edge case: it maxed out the monitor item's
+  // heat and pushed its score to a capped 100, independently clearing a
+  // notify_threshold of 100 that the "fires a watchlist match below the score
+  // threshold" test meant to be reachable only via forceNotify. Gate on
+  // elapsed time instead; scoreDeal already tolerates a null heat.
+  if (ageSec < 60) return null;
+  const ageMin = ageSec / 60;
   const velocity = ((item.upvotes ?? 0) + (item.comments ?? 0)) / ageMin;
   return { velocity, baseline };
 }
