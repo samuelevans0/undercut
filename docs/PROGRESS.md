@@ -6,10 +6,12 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 11 done: hand-rolled RSS reader (src/sources/rss.js) plus Slickdeals and
-Woot adapters. 167 tests green (152 prior + 15 new: 7 parseRss + 5
-slickdealsAdapter + 3 wootAdapter; the brief's "13 tests" estimate undercounted
-the verbatim test code, which is authoritative).
+Task 12 done: eBay Browse API adapter (src/sources/ebay.js) with OAuth
+client-credentials token caching and one-query-per-poll rotation by
+`config.cursor`, plus the source registry (src/sources/index.js: `ADAPTERS`,
+`getAdapter`). 182 tests green (167 prior + 15 new: 12 ebayAdapter + 3
+adapter registry; the brief's "14 tests" estimate undercounted the verbatim
+test code, which is authoritative).
 
 ## Task ledger
 - [x] T1 scaffold
@@ -23,7 +25,7 @@ the verbatim test code, which is authoritative).
 - [x] T9 rules
 - [x] T10 reddit source
 - [x] T11 rss sources (slickdeals, woot)
-- [ ] T12 ebay source
+- [x] T12 ebay source
 - [ ] T13 notify
 - [ ] T14 poll pipeline
 - [ ] T15 auth api
@@ -65,6 +67,12 @@ the verbatim test code, which is authoritative).
   (`import slickXml from "./fixtures/slickdeals.xml?raw"`). Every `describe`/
   `it` block is unmodified from the brief. Verified 15 tests pass (7 parseRss
   + 5 slickdealsAdapter + 3 wootAdapter), not the "13 tests" the brief's prose
+  estimated.
+- Task 12: `tests/source-ebay.test.js`'s fixture import (`import fixture from
+  "./fixtures/ebay-search.json"`) is a plain JSON import, not a `readFileSync`
+  call, so it sidesteps the virtualized-`node:fs` issue from Tasks 3 and 11
+  entirely; no test-harness workaround was needed here. Verified 15 tests pass
+  (12 ebayAdapter + 3 adapter registry), not the "14 tests" the brief's prose
   estimated.
 
 ## Assumptions to verify (from spec section 17)

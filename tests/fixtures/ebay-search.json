@@ -1,0 +1,24 @@
+{
+  "total": 2,
+  "itemSummaries": [
+    {
+      "itemId": "v1|123456789|0",
+      "title": "LG 27GR83Q 27in 1440p 240Hz Gaming Monitor Open Box",
+      "itemWebUrl": "https://www.ebay.com/itm/123456789",
+      "price": { "value": "210.00", "currency": "USD" },
+      "marketingPrice": { "originalPrice": { "value": "599.00", "currency": "USD" } },
+      "condition": "Open box",
+      "seller": { "username": "techdeals", "feedbackPercentage": "99.2" },
+      "itemCreationDate": "2026-08-04T06:14:00.000Z"
+    },
+    {
+      "itemId": "v1|987654321|0",
+      "title": "Samsung 990 Pro 2TB NVMe SSD New Sealed",
+      "itemWebUrl": "https://www.ebay.com/itm/987654321",
+      "price": { "value": "52.00", "currency": "USD" },
+      "condition": "New",
+      "seller": { "username": "flakyseller", "feedbackPercentage": "88.0" },
+      "itemCreationDate": "2026-08-04T05:40:00.000Z"
+    }
+  ]
+}
