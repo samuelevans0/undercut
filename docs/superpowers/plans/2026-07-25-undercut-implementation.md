@@ -3291,6 +3291,16 @@ describe("ebayAdapter", () => {
     expect(await ebayAdapter.list(env, { queries: ["x"] }, f)).toEqual([]);
   });
 
+  it("throws on a 200 that is not a Browse API result body", async () => {
+    // eBay returns an error envelope with 200 in some auth and quota cases.
+    // Reading that as "no matches" would hide a broken source indefinitely.
+    const f = fakeFetch([tokenOk, [
+      "item_summary/search",
+      async () => Response.json({ errors: [{ errorId: 1001, message: "quota exceeded" }] }),
+    ]]);
+    await expect(ebayAdapter.list(env, { queries: ["x"] }, f)).rejects.toThrow(/unrecognised body/i);
+  });
+
   it("throws when credentials are missing", async () => {
     await expect(ebayAdapter.list({}, { queries: ["x"] }, fakeFetch([]))).rejects.toThrow(/credential/i);
   });
@@ -3405,6 +3415,18 @@ export const ebayAdapter = {
     });
     if (!res.ok) throw new Error(`ebay search failed: ${res.status}`);
     const data = await res.json();
+
+    // Third instance of the same hazard (see the Reddit and RSS adapters): a
+    // 200 carrying something that is not a Browse API result body would read as
+    // "no matches" rather than as a failure. eBay returns an error envelope
+    // with 200 in some auth and quota cases.
+    //
+    // The legitimate empty here is `{"total": 0}` with no itemSummaries, which
+    // is simply a search that matched nothing, and it stays allowed.
+    if (typeof data?.total !== "number" && !Array.isArray(data?.itemSummaries)) {
+      throw new Error(`ebay search returned an unrecognised body for "${query}"`);
+    }
+
     return (data.itemSummaries ?? []).map(toRawItem);
   },
 };
