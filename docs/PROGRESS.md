@@ -6,6 +6,21 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 13 done: notification decision, copy, and delivery. `src/core/notify-decision.js`
+(pure) holds `shouldNotify` (already-notified check first, price-drop the only
+escape) and `buildNotification` (anomaly-first copy: unprecedented-price fact
+leads when reference history exists, falls back to stated discount, then to
+freshness alone). `src/notify.js` holds `notifyDeal`, which wraps each
+`sendImpl` call in its own try/catch (one corrupt subscription cannot starve
+the rest) and wraps the whole function body in a second try/catch (a D1
+failure reading subs or writing rows cannot escape) — both needed because the
+vendored `sendPush` in `src/lib/webpush.js` runs its encryption and VAPID JWT
+signing outside its own try block, confirmed by reading the file directly
+(lines 96-98 sit before the `try` at line 99). `SOURCE_HEAT_BASELINE` appended
+to `src/config.js`. 206 tests green (183 prior + 23 new: 9 shouldNotify + 9
+buildNotification + 5 notifyDeal; the brief's "21 tests" estimate
+undercounted the verbatim test code, which is authoritative).
+
 Task 12 done: eBay Browse API adapter (src/sources/ebay.js) with OAuth
 client-credentials token caching and one-query-per-poll rotation by
 `config.cursor`, plus the source registry (src/sources/index.js: `ADAPTERS`,
@@ -31,7 +46,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T10 reddit source
 - [x] T11 rss sources (slickdeals, woot)
 - [x] T12 ebay source
-- [ ] T13 notify
+- [x] T13 notify
 - [ ] T14 poll pipeline
 - [ ] T15 auth api
 - [ ] T16 read api

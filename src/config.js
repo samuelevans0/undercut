@@ -25,3 +25,13 @@ export const CATEGORY_WEIGHTS = {
   webcam: 0.8,
   unknown: 0.5,
 };
+
+// Votes plus comments per minute that a normal post on this source attracts.
+// Heat is scored as a ratio against this, so a source with no engagement
+// signal simply contributes nothing.
+export const SOURCE_HEAT_BASELINE = {
+  reddit: 5,
+  slickdeals: 0,
+  woot: 0,
+  ebay: 0,
+};
