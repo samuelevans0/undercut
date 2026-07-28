@@ -2719,6 +2719,22 @@ describe("redditAdapter", () => {
     await expect(redditAdapter.list(env, { subreddits: ["a"] }, f)).rejects.toThrow(/429/);
   });
 
+  it("throws on a 200 that carries no children array", async () => {
+    // Reddit answers 200 with {"reason":"private"} for private/banned subs.
+    // Returning [] here would look exactly like a quiet day.
+    const f = fakeFetch([tokenOk, ["oauth", async () => Response.json({ reason: "private" })]]);
+    await expect(redditAdapter.list(env, { subreddits: ["a"] }, f)).rejects.toThrow(/children/i);
+  });
+
+  it("skips non-post children rather than emitting a degenerate item", async () => {
+    const custom = structuredClone(fixture);
+    custom.data.children.push({ kind: "more", data: { count: 12 } });
+    const f = fakeFetch([tokenOk, ["oauth", async () => Response.json(custom)]]);
+    const items = await redditAdapter.list(env, { subreddits: ["a"] }, f);
+    expect(items).toHaveLength(3);
+    expect(items.every((i) => !i.externalId.includes("undefined"))).toBe(true);
+  });
+
   it("defaults to buildapcsales with no config", async () => {
     const f = fakeFetch([tokenOk, listingOk]);
     await redditAdapter.list(env, {}, f);
@@ -2804,8 +2820,20 @@ export const redditAdapter = {
       });
       if (!res.ok) throw new Error(`reddit listing failed for ${sub}: ${res.status}`);
       const data = await res.json();
-      for (const child of data?.data?.children ?? []) {
-        if (child?.data) items.push(toRawItem(child.data));
+
+      // A 200 with no children array is NOT an empty day. Reddit answers 200
+      // with `{"reason":"private"}` for private, quarantined and banned
+      // subreddits, and `?? []` would turn that into a silent zero-result poll
+      // that looks identical to nothing being posted. Throw so source health
+      // records it and the source eventually disables itself loudly.
+      const children = data?.data?.children;
+      if (!Array.isArray(children)) {
+        throw new Error(`reddit listing for ${sub} returned no children array (private, banned, or shape changed)`);
+      }
+
+      for (const child of children) {
+        // Skip "more" stubs and anything that is not a link post.
+        if (child?.kind === "t3" && child.data) items.push(toRawItem(child.data));
       }
     }
     return items;
