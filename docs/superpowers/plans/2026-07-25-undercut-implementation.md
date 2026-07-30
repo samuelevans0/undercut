@@ -4548,7 +4548,11 @@ git commit -m "feat: add single user auth with first run setup claim"
 - Produces:
   - `routeFeed`: `GET /api/feed?minScore=&limit=`, `GET /api/deal/:id`
   - `routeSettings`: `GET /api/settings`, `PATCH /api/settings`, `GET|POST /api/watchlist`, `DELETE /api/watchlist/:id`, `GET|POST /api/rules`, `DELETE /api/rules/:id`, `POST /api/sources/:id/enable`
-  - `routePush`: `GET /api/push/key`, `POST /api/push/subscribe`, `POST /api/push/unsubscribe`, `POST /api/push/test`
+  - `routePush`: `GET /api/push/key`, `POST /api/push/subscribe`, `POST /api/push/unsubscribe`
+
+(`POST /api/push/test` was listed here in an earlier draft but has no code or
+test in this task. It moved to Task 19, which owns the push subscription UX and
+is where a "send a test push" control belongs.)
 
 - [ ] **Step 1: Write the failing test**
 
