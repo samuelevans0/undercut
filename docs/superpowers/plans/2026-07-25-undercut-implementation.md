@@ -4638,6 +4638,13 @@ describe("GET /api/deal/:id", () => {
     expect(body.reasons[0].key).toBe("outlier");
   });
 
+  it("does not ship the raw reasons json alongside the parsed array", async () => {
+    const id = await seedDeal();
+    const body = await (await raw(`/api/deal/${id}`)).json();
+    expect(body.reasons[0].key).toBe("outlier");
+    expect(body.deal.score_reasons_json).toBeUndefined();
+  });
+
   it("includes the reference price when one exists", async () => {
     const id = await seedDeal();
     await env.DB.prepare(
@@ -4785,8 +4792,12 @@ export async function routeFeed(request, env, url, path) {
     if (!deal) return json({ error: "not found" }, 404);
     const events = await listEvents(env.DB, deal.id);
     const reference = await getReference(env.DB, deal.spec_key);
-    const { reasons } = withReasons(deal);
-    return json({ deal, reasons, events, reference });
+    // Take the sanitised row, not the original. Destructuring only `reasons`
+    // and returning `deal` would ship the raw score_reasons_json text column
+    // alongside the parsed array, which is exactly what withReasons exists to
+    // prevent and what the feed route already avoids.
+    const { reasons, ...safeDeal } = withReasons(deal);
+    return json({ deal: safeDeal, reasons, events, reference });
   }
 
   return null;
