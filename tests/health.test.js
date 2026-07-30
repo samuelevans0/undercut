@@ -22,9 +22,13 @@ describe("health", () => {
     expect(res.status).toBe(200);
   });
 
-  it("404s unknown api routes as json", async () => {
+  it("401s unknown api routes as json when unauthenticated", async () => {
+    // Task 15 added a global session gate in front of the routers: any path
+    // outside OPEN_PREFIXES requires a session before routing decides
+    // "not found", so an unauthenticated caller sees 401 rather than a 404
+    // that would leak whether the route exists.
     const res = await call("/api/nope");
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
     expect(await res.json()).toHaveProperty("error");
   });
 });

@@ -6,6 +6,38 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 15 done: the auth API. `src/api/auth.js` exposes `routeAuth` (`GET
+/api/auth/state`, `POST /api/auth/setup`, `POST /api/auth/login`, `POST
+/api/auth/logout`) and `requireSession` (throws `HttpError(401)` with no valid
+`uc_session` cookie), built on the already-tested `hashPassword`/
+`verifyPassword`, `createSessionCookie`/`readSession`/`clearSessionCookie`,
+and `getPrefs`/`setPrefs`. `src/index.js`'s `handleApi` was restructured with
+the machine-endpoint bypass first (`/api/poll/` returns before either gate
+exists, using the same code Task 14 already positioned there), then the
+same-origin check for non-GET/HEAD, then the session gate for every path
+outside `OPEN_PREFIXES` (`/api/auth/`, `/api/health`), then the new
+`browserRouters` array (currently just `routeAuth`; Task 16 appends to it).
+236 tests green (224 prior + 12 new auth tests; the brief's "13 tests"
+estimate overcounted by one, the verbatim test file has 12 `it()` blocks).
+
+Explicitly re-ran `npx vitest run tests/poll.test.js` after the `src/index.js`
+restructure: all 18 pass (13 pollSource + 5 route), confirming the HMAC-signed
+machine endpoints are unaffected by the new gates.
+
+One pre-existing test needed updating for a genuine, intended cross-task
+behavior change: Task 1's `tests/health.test.js` asserted that an
+unauthenticated request to an unknown `/api/*` path 404s. That test predates
+any auth wall. With Task 15's gate in place, an unauthenticated request to any
+path outside `OPEN_PREFIXES` now hits `requireSession` and 401s before routing
+ever reaches the "not found" fallback, whether or not the path would have
+matched a route, so unauthenticated callers can't distinguish "route doesn't
+exist" from "route exists but needs a session". That is the correct, intended
+effect of putting a global gate in front of the routers, not a bug, so the
+test's expected status was changed from 404 to 401 (kept the "response is JSON
+with an error property" assertion). Not a case of loosening the current task's
+own tests to fit the implementation; it is a stale assumption in a different
+task's frozen test invalidated by this task's actual purpose.
+
 Task 14 done: the poll pipeline. `src/poll.js` wires fetch, parse, classify,
 fingerprint, upsert/appendEvent, getReference, scoreDeal, evaluateRules,
 shouldNotify/notifyDeal, and end-of-tick learned-reference refresh into one
@@ -86,7 +118,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T12 ebay source
 - [x] T13 notify
 - [x] T14 poll pipeline
-- [ ] T15 auth api
+- [x] T15 auth api
 - [ ] T16 read api
 - [ ] T17 feed + detail UI
 - [ ] T18 settings UI
@@ -132,6 +164,12 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
   entirely; no test-harness workaround was needed here. Verified 15 tests pass
   (12 ebayAdapter + 3 adapter registry), not the "14 tests" the brief's prose
   estimated.
+- Task 15: adding the global session gate changed the true status code for
+  unauthenticated requests to unknown `/api/*` paths from 404 (Task 1's
+  assumption, written before auth existed) to 401 (the gate now runs before
+  the routers' "not found" fallback for anything outside `OPEN_PREFIXES`).
+  Updated the one affected assertion in `tests/health.test.js` accordingly;
+  see Status above for the full reasoning.
 - Task 14: `vitest.config.js` needed `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`
   test bindings added (see Status above) because this is the first test to
   drive the reddit adapter through the real `cloudflare:test` `env` rather
