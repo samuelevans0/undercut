@@ -5302,36 +5302,119 @@ route();
 async function screenSettings() { app.innerHTML = `<div class="empty">Settings arrive in the next task.</div>`; }
 ```
 
-- [ ] **Step 4: Verify by screenshot**
+- [ ] **Step 4a: Create `.dev.vars` (gitignored) so local auth works**
 
-Start the dev server, seed a deal, and capture the feed. The screenshot tool lives at the Websites root and is shared across projects.
+Without `SESSION_SECRET` present, `createSessionCookie` calls WebCrypto with an
+undefined key and auth 500s with an HMAC key-length error. `.dev.vars` is
+already in `.gitignore`. These are local-only throwaway values, never the
+production secrets.
+
+```
+SESSION_SECRET=local-dev-session-secret-not-for-production
+POLL_SECRET=local-dev-poll-secret-not-for-production
+PUBLIC_ORIGIN=http://localhost:8787
+VAPID_SUBJECT=mailto:dev@localhost
+```
+
+- [ ] **Step 4b: Create `scripts/shot.mjs`, an authenticated screenshot helper**
+
+The shared `Websites/screenshot.js` cannot log in, and every screen except the
+login form sits behind the session gate, so it would only ever capture the login
+box. This helper claims or logs in, carries the cookie into puppeteer, then
+shoots. Reused by Task 18 and by the deploy verification in Task 21.
+
+```js
+// Authenticated screenshot helper for local dev.
+// Usage: node scripts/shot.mjs "#/" out.png [--width=390] [--height=844]
+import puppeteer from "puppeteer";
+
+const ORIGIN = process.env.UC_ORIGIN || "http://localhost:8787";
+const PASSWORD = process.env.UC_PASSWORD || "screenshot-password-1234";
+
+const args = process.argv.slice(2);
+const hash = args[0] || "#/";
+const output = args[1] || "shot.png";
+const width = parseInt(args.find((a) => a.startsWith("--width="))?.split("=")[1] || "390", 10);
+const height = parseInt(args.find((a) => a.startsWith("--height="))?.split("=")[1] || "844", 10);
+
+async function login() {
+  const body = JSON.stringify({ password: PASSWORD });
+  // The origin header matters: the app rejects cross-origin writes.
+  const headers = { "content-type": "application/json", origin: ORIGIN };
+
+  // Claim on a fresh database, log in on every run after that.
+  let res = await fetch(`${ORIGIN}/api/auth/setup`, { method: "POST", headers, body });
+  if (res.status === 409) {
+    res = await fetch(`${ORIGIN}/api/auth/login`, { method: "POST", headers, body });
+  }
+  if (!res.ok) throw new Error(`auth failed: ${res.status} ${await res.text()}`);
+
+  const setCookie = res.headers.get("set-cookie");
+  if (!setCookie) throw new Error("no set-cookie header in the auth response");
+  const [name, value] = setCookie.split(";")[0].split("=");
+  return { name, value };
+}
+
+const { name, value } = await login();
+const browser = await puppeteer.launch({ headless: true });
+try {
+  const page = await browser.newPage();
+  await page.setViewport({ width, height });
+  await page.setCookie({ name, value, domain: "localhost", path: "/" });
+  await page.goto(`${ORIGIN}/${hash}`, { waitUntil: "networkidle2", timeout: 30000 });
+  // The hash router renders after load; give it a beat before capturing.
+  await new Promise((r) => setTimeout(r, 500));
+  await page.screenshot({ path: output, fullPage: false });
+  console.log(`saved ${output}`);
+} finally {
+  await browser.close();
+}
+```
+
+puppeteer resolves from `Websites/node_modules` because Node walks parent
+directories, so nothing needs installing inside this project.
+
+- [ ] **Step 4c: Verify by screenshot**
+
+Start the dev server in one shell:
 
 ```bash
 npx wrangler dev --port 8787
 ```
 
-In a second shell, claim the instance and insert a deal so the feed is not empty:
-
-```bash
-npx wrangler d1 execute undercut-db --local --command "UPDATE prefs SET setup_done=0, password_hash=NULL WHERE id=1"
-```
-
-Then in the browser at `http://localhost:8787`, claim with any 12+ character password, and insert a sample deal:
+In a second shell, insert a sample deal so the feed is not empty:
 
 ```bash
 npx wrangler d1 execute undercut-db --local --command "INSERT INTO deals (fingerprint,source_id,title,url,price_cents,was_price_cents,category,spec_key,condition,posted_at,first_seen_at,last_seen_at,score,score_reasons_json) VALUES ('demo','reddit','LG 27GR83Q 27\" 1440p 240Hz IPS','https://example.test',6000,39900,'monitor','monitor:27:1440p:240hz','new',strftime('%s','now')-40,strftime('%s','now'),strftime('%s','now'),100,'[{\"key\":\"outlier\",\"label\":\"Outlier\",\"points\":50,\"detail\":\"70% below the observed floor of \$198\"},{\"key\":\"discount\",\"label\":\"Discount\",\"points\":25,\"detail\":\"85% off the stated \$399\"},{\"key\":\"heat\",\"label\":\"Heat\",\"points\":20,\"detail\":\"2.0x the usual activity\"},{\"key\":\"category\",\"label\":\"Category\",\"points\":19,\"detail\":\"monitor weighted 1.2x\"}]')"
 ```
 
-Capture both screens:
+Capture both screens with the authenticated helper:
 
 ```bash
-node "../screenshot.js" "http://localhost:8787/#/" undercut-feed.png --width=390 --height=844
-node "../screenshot.js" "http://localhost:8787/#/deal/1" undercut-deal.png --width=390 --height=844
+MSYS_NO_PATHCONV=1 node scripts/shot.mjs "#/" undercut-feed.png
+MSYS_NO_PATHCONV=1 node scripts/shot.mjs "#/deal/1" undercut-deal.png
 ```
 
-Open both images and confirm against the design direction: monospace fixed columns, score gutter on the left in green, tabular price column right-aligned with a struck-through was-price, source health in the top bar, no cards, no gradients, nothing centred.
+**Git Bash mangles `#` in arguments** via MSYS path translation, which is why
+`MSYS_NO_PATHCONV=1` is on both commands. Without it the hash is rewritten and
+the router lands on the feed regardless of what you asked for, so the deal
+screenshot would silently be a second copy of the feed. See
+`ClaudeBrain/Knowledge/Git Bash MSYS path-mangling of hash-route CLI args.md`.
 
-**Git Bash mangles `#` in URL arguments** via MSYS path translation. If the hash route does not load, quote the URL and prefix with `MSYS_NO_PATHCONV=1`. See `ClaudeBrain/Knowledge/Git Bash MSYS path-mangling of hash-route CLI args.md`.
+**Open both images and actually look at them.** A saved PNG is not evidence the
+screen is right. Confirm against the approved direction: monospace fixed
+columns, the score gutter on the left in green, a right-aligned tabular price
+column with a struck-through was-price beneath it, source health in the top
+bar. No cards, no gradients, nothing centred, no pill buttons.
+
+If the images show a login form, the cookie did not carry — check that
+`.dev.vars` exists and that `wrangler dev` picked it up.
+
+Afterwards, kill the dev server and any orphaned workerd:
+
+```bash
+powershell "Get-Process workerd,wrangler -ErrorAction SilentlyContinue | Stop-Process -Force"
+```
 
 - [ ] **Step 5: Update `docs/PROGRESS.md` and commit**
 
