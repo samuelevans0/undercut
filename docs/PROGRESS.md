@@ -6,6 +6,30 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 16 done: the read and settings API. `src/api/feed.js` exposes
+`routeFeed` (`GET /api/feed?minScore=&limit=`, `GET /api/deal/:id`);
+`src/api/settings.js` exposes `routeSettings` (`GET|PATCH /api/settings`,
+`GET|POST /api/watchlist`, `DELETE /api/watchlist/:id`, `GET|POST /api/rules`,
+`DELETE /api/rules/:id`, `POST /api/sources/:id/enable`); `src/api/push.js`
+exposes `routePush` (`GET /api/push/key`, `POST /api/push/subscribe`,
+`POST /api/push/unsubscribe`). All three registered in `src/index.js`'s
+`browserRouters` array, behind both the origin check and the session gate,
+without touching the `/api/poll/` early-return branch above them. Feed's
+`limit`/`minScore` query params are clamped at both ends (`limit` must be a
+finite integer `> 0`, then capped at `LIMITS.maxFeedRows`; `minScore` clamped
+to 0..100) so a negative or zero `limit` can't hit SQLite's "negative LIMIT
+means unbounded" behavior. `withReasons` parses `score_reasons_json` inside a
+try/catch so one malformed row can't break the whole feed response.
+`publicPrefs` strips `password_hash` before every `/api/settings` response;
+it's the only place prefs get serialised. `routeSettings`'s rule validation
+requires `predicate` to be a non-empty array and every clause's `op` to be in
+`VALID_OPS`, and its watchlist/rule/source-enable SQL binds every value as a
+parameter, never interpolating a caller-supplied key or string into the
+query. 256 tests green (236 prior + 20 new; the brief's "20 tests" estimate
+was correct this time). Explicitly re-ran `npx vitest run tests/poll.test.js`
+after the `src/index.js` edit: 18/18 still pass, confirming the machine
+endpoints are unaffected by the new routers.
+
 Task 15 done: the auth API. `src/api/auth.js` exposes `routeAuth` (`GET
 /api/auth/state`, `POST /api/auth/setup`, `POST /api/auth/login`, `POST
 /api/auth/logout`) and `requireSession` (throws `HttpError(401)` with no valid
@@ -119,7 +143,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T13 notify
 - [x] T14 poll pipeline
 - [x] T15 auth api
-- [ ] T16 read api
+- [x] T16 read api
 - [ ] T17 feed + detail UI
 - [ ] T18 settings UI
 - [ ] T19 PWA shell + push

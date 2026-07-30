@@ -1,9 +1,12 @@
 import { json, checkOrigin, HttpError } from "./lib/http.js";
 import { routePoll } from "./api/poll.js";
 import { routeAuth, requireSession } from "./api/auth.js";
+import { routeFeed } from "./api/feed.js";
+import { routeSettings } from "./api/settings.js";
+import { routePush } from "./api/push.js";
 
 const OPEN_PREFIXES = ["/api/auth/", "/api/health"];
-const browserRouters = [routeAuth];
+const browserRouters = [routeAuth, routeFeed, routeSettings, routePush];
 
 async function handleApi(request, env, url, path) {
   if (path === "/api/health") return json({ ok: true });
