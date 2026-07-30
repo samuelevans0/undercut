@@ -32,8 +32,12 @@ export async function routeFeed(request, env, url, path) {
     if (!deal) return json({ error: "not found" }, 404);
     const events = await listEvents(env.DB, deal.id);
     const reference = await getReference(env.DB, deal.spec_key);
-    const { reasons } = withReasons(deal);
-    return json({ deal, reasons, events, reference });
+    // Take the sanitised row, not the original. Destructuring only `reasons`
+    // and returning `deal` would ship the raw score_reasons_json text column
+    // alongside the parsed array, which is exactly what withReasons exists to
+    // prevent and what the feed route already avoids.
+    const { reasons, ...safeDeal } = withReasons(deal);
+    return json({ deal: safeDeal, reasons, events, reference });
   }
 
   return null;

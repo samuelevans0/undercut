@@ -30,6 +30,18 @@ was correct this time). Explicitly re-ran `npx vitest run tests/poll.test.js`
 after the `src/index.js` edit: 18/18 still pass, confirming the machine
 endpoints are unaffected by the new routers.
 
+Review round 1 fix: `GET /api/deal/:id` was destructuring only `reasons` out
+of `withReasons(deal)` and returning the original `deal` row in the response,
+so the raw `score_reasons_json` text column shipped alongside the parsed
+`reasons` array (a bug in a line the plan's own author introduced mid-build
+while tidying that expression, not in the original brief's committed code).
+`GET /api/feed` already avoided this by using the full sanitised return value
+via `rows.map(withReasons)`. Fixed by destructuring `reasons` and the rest of
+the sanitised row (`...safeDeal`) out of `withReasons(deal)` and returning
+`{ deal: safeDeal, ... }`. Added a regression test asserting both that
+`reasons[0].key` still arrives and that `deal.score_reasons_json` is
+`undefined`. 257 tests green (256 + 1 regression test).
+
 Task 15 done: the auth API. `src/api/auth.js` exposes `routeAuth` (`GET
 /api/auth/state`, `POST /api/auth/setup`, `POST /api/auth/login`, `POST
 /api/auth/logout`) and `requireSession` (throws `HttpError(401)` with no valid

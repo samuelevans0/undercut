@@ -77,6 +77,13 @@ describe("GET /api/deal/:id", () => {
     expect(body.reasons[0].key).toBe("outlier");
   });
 
+  it("does not ship the raw reasons json alongside the parsed array", async () => {
+    const id = await seedDeal();
+    const body = await (await raw(`/api/deal/${id}`)).json();
+    expect(body.reasons[0].key).toBe("outlier");
+    expect(body.deal.score_reasons_json).toBeUndefined();
+  });
+
   it("includes the reference price when one exists", async () => {
     const id = await seedDeal();
     await env.DB.prepare(
