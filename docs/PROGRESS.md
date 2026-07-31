@@ -6,6 +6,39 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 18 done: the settings screen (`public/app.js`'s `screenSettings`,
+replacing the T17 stub) and a `#/settings` link added to the top bar
+(`public/index.html`). Five sections in the deliberate order the brief calls
+out: SOURCES first (name, last-success age via `ago()`, OK/DOWN state, an
+inline RETRY button on down sources posting to `/api/sources/:id/enable`),
+NOTIFY ABOVE (range input, live-updating value display on `oninput`, PATCH to
+`/api/settings` only on `onchange`), WATCHING (label/query/hit-count rows,
+delete buttons, an add field posting to `/api/watchlist`), RULES (label/
+category/predicate rows, delete only), and NOTIFICATIONS (the push-enable
+button). No unit tests; verified by screenshot per the plan. Zero runtime
+dependencies. Every interpolated value (source name/id, watchlist label/
+query, rule label/category/predicate) passed through `esc()` before reaching
+`innerHTML`, confirmed by reading every interpolation site. 257 tests
+unchanged and still green (no test files touched).
+
+Two deviations from the brief's literal verbatim code, both explained in
+`task-18-report.md`: (1) the brief's `document.getElementById("push").onclick
+= enablePush;` throws `ReferenceError: enablePush is not defined` the instant
+that line *evaluates* (T19 hasn't defined `enablePush` yet), not when the
+button is later clicked, which blanks the entire settings screen on every
+render — verified in node. Wrapped it in a closure (`() => enablePush()`) so
+the reference is only evaluated on click, preserving the intended
+"ReferenceError on click, not a bug" behavior instead of accidentally
+breaking the screen outright. (2) added `w.hit_count` to each watchlist row's
+subtext; `listWatchlist`'s `SELECT *` already returns it and the task's own
+"what the screen contains" section requires watchlist hit counts, but the
+brief's row markup omitted displaying it. Not added: a "count of alerts this
+threshold would have produced over the past week" next to the slider, which
+the task description also mentions but which the brief's documented interface
+(only `/api/settings`, `/api/watchlist`, `/api/rules`, `/api/sources/:id/enable`,
+and push endpoints) has no backend support for; flagged rather than
+guess-implemented against an undocumented endpoint dependency.
+
 Task 17 done: the Ticker design system, feed, and deal detail screens.
 `public/app.css` (dark monospace tokens, fixed-column `.row`/`.head` grids,
 `.sc`/`.sc.good`/`.sc.warm` score gutter, `tabular-nums` prices, `.why`
@@ -228,7 +261,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T15 auth api
 - [x] T16 read api
 - [x] T17 feed + detail UI
-- [ ] T18 settings UI
+- [x] T18 settings UI
 - [ ] T19 PWA shell + push
 - [ ] T20 cron-pinger
 - [ ] T21 deploy runbook
@@ -276,6 +309,23 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
   price-history chart and the low/typical/now reference line (both explicitly
   required by "what the screens must show") would not render if followed
   literally. Seeded both tables manually before capturing; see Status above.
+- Task 18: the brief's own verbatim line `document.getElementById("push")
+  .onclick = enablePush;` throws immediately on render, not on click, because
+  a bare reference to an undeclared identifier throws `ReferenceError` the
+  moment the expression is *evaluated* (confirmed with a two-line node
+  repro), and `enablePush` isn't defined until T19. Every render of
+  `#/settings` before T19 lands would have thrown out of `screenSettings`,
+  been caught by `route()`'s outer try/catch, and replaced the whole screen
+  with the error text instead of showing settings at all. Fixed by deferring
+  the reference into a closure (`() => enablePush()`), which only evaluates
+  it on click, matching the task's actual intent ("a ReferenceError on click
+  is expected"). Also found the brief's watchlist row markup never displays
+  `w.hit_count` even though `listWatchlist`'s `SELECT *` already returns it
+  and the task's own "what the screen contains" section requires watchlist
+  hit counts; added it to the row subtext. Did not implement the "count of
+  alerts this threshold would have produced over the past week" mentioned in
+  the same section: no endpoint in the brief's documented interface supports
+  it, and guessing at one felt riskier than flagging it.
 - Task 15: adding the global session gate changed the true status code for
   unauthenticated requests to unknown `/api/*` paths from 404 (Task 1's
   assumption, written before auth existed) to 401 (the gate now runs before

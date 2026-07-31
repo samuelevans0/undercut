@@ -1,7 +1,87 @@
 const app = document.getElementById("app");
 const statusEl = document.getElementById("status");
 
-async function screenSettings() { app.innerHTML = `<div class="empty">Settings arrive in the next task.</div>`; }
+async function screenSettings() {
+  const [{ prefs, sources }, { watchlist }, { rules }] = await Promise.all([
+    api("/api/settings"), api("/api/watchlist"), api("/api/rules"),
+  ]);
+
+  app.innerHTML = `
+    <div class="sec">SOURCES</div>
+    <div id="sources">${sources.map((s) => `
+      <div class="row" style="grid-template-columns:1fr auto">
+        <span><div class="nm">${esc(s.name)}</div>
+          <div class="sub">${s.last_success_at ? "last ok " + ago(s.last_success_at) + " ago" : "never succeeded"}</div></span>
+        <span style="font-size:10.5px;color:${s.enabled ? "var(--good)" : "var(--bad)"}">
+          ${s.enabled ? "OK" : `DOWN <button class="btn ghost" style="display:inline;margin:0 0 0 8px;padding:4px 8px" data-enable="${esc(s.id)}">RETRY</button>`}
+        </span>
+      </div>`).join("")}</div>
+
+    <div class="sec">NOTIFY ABOVE</div>
+    <div class="pad">
+      <input type="range" min="0" max="100" value="${prefs.notify_threshold}" id="thr" style="width:100%">
+      <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--dim);margin-top:6px">
+        <span>0</span><span id="thrv" style="color:var(--good)">${prefs.notify_threshold}</span><span>100</span>
+      </div>
+      <div class="sub" style="margin-top:9px">Raise this if the alerts get noisy. Rules and watchlist entries fire regardless.</div>
+    </div>
+
+    <div class="sec">WATCHING</div>
+    <div id="wl">${watchlist.length ? watchlist.map((w) => `
+      <div class="row" style="grid-template-columns:1fr auto">
+        <span><div class="nm">${esc(w.label)}</div><div class="sub">${esc(w.query)} / ${w.hit_count} hit${w.hit_count === 1 ? "" : "s"}</div></span>
+        <button class="btn ghost" style="margin:0;padding:5px 9px" data-del-wl="${w.id}">DELETE</button>
+      </div>`).join("") : `<div class="empty">Nothing on the watchlist.</div>`}</div>
+    <div class="pad">
+      <input class="field" id="wlq" placeholder="240hz monitor under $200">
+      <button class="btn" id="wladd">ADD TO WATCHLIST</button>
+    </div>
+
+    <div class="sec">RULES</div>
+    <div id="rl">${rules.length ? rules.map((r) => `
+      <div class="row" style="grid-template-columns:1fr auto">
+        <span><div class="nm">${esc(r.label)}</div><div class="sub">${esc(r.category)} / ${esc(r.predicate_json)}</div></span>
+        <button class="btn ghost" style="margin:0;padding:5px 9px" data-del-rule="${r.id}">DELETE</button>
+      </div>`).join("") : `<div class="empty">No rules.</div>`}</div>
+
+    <div class="sec">NOTIFICATIONS</div>
+    <div class="pad">
+      <button class="btn" id="push">ENABLE PUSH ON THIS DEVICE</button>
+      <div class="sub" id="pushmsg">On iPhone, add Undercut to your home screen first. Push does not work in Safari tabs.</div>
+    </div>
+    <a class="btn ghost" href="#/">BACK TO FEED</a>`;
+
+  const thr = document.getElementById("thr");
+  thr.oninput = () => { document.getElementById("thrv").textContent = thr.value; };
+  thr.onchange = async () => {
+    await api("/api/settings", { method: "PATCH", body: { notify_threshold: Number(thr.value) } });
+  };
+
+  document.getElementById("wladd").onclick = async () => {
+    const query = document.getElementById("wlq").value.trim();
+    if (!query) return;
+    await api("/api/watchlist", { method: "POST", body: { label: query, query } });
+    route();
+  };
+
+  app.querySelectorAll("[data-del-wl]").forEach((b) => {
+    b.onclick = async () => { await api(`/api/watchlist/${b.dataset.delWl}`, { method: "DELETE" }); route(); };
+  });
+  app.querySelectorAll("[data-del-rule]").forEach((b) => {
+    b.onclick = async () => { await api(`/api/rules/${b.dataset.delRule}`, { method: "DELETE" }); route(); };
+  });
+  app.querySelectorAll("[data-enable]").forEach((b) => {
+    b.onclick = async () => { await api(`/api/sources/${b.dataset.enable}/enable`, { method: "POST" }); route(); };
+  });
+
+  // Deferred as a closure rather than `onclick = enablePush` directly: T19
+  // hasn't defined enablePush yet, and a bare reference to an undeclared
+  // identifier throws ReferenceError the instant this line *evaluates*, not
+  // when the button is later clicked, which would blank the whole screen on
+  // every render before T19 lands. Wrapping it defers that throw to click
+  // time, matching the intended "ReferenceError on click" behavior.
+  document.getElementById("push").onclick = () => enablePush();
+}
 
 const api = async (path, opts = {}) => {
   const res = await fetch(path, {
