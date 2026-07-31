@@ -6,6 +6,59 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 17 done: the Ticker design system, feed, and deal detail screens.
+`public/app.css` (dark monospace tokens, fixed-column `.row`/`.head` grids,
+`.sc`/`.sc.good`/`.sc.warm` score gutter, `tabular-nums` prices, `.why`
+reasons grid, `.spark` bar chart, block `.btn`/`.btn.ghost`), `public/index.html`
+(sticky top bar with logo and source-health status, hash-routed `#app` mount),
+and `public/app.js` (hash router for `#/`, `#/deal/:id`, `#/login`, and a
+`#/settings` stub pending Task 18) are new. No unit tests; this task is
+verified by screenshot per the plan. Zero runtime dependencies, plain ES
+modules, no bundler. Every feed-sourced value (`title`, `source_id`,
+`condition`, `url`, reason `label`/`detail`) is passed through `esc()` before
+reaching `innerHTML`, confirmed by reading every interpolation site in
+`app.js`. 257 tests unchanged and still green (no test files touched).
+
+Also added, as prerequisites the brief calls out by name: `.dev.vars`
+(gitignored, local-only `SESSION_SECRET`/`POLL_SECRET`/`PUBLIC_ORIGIN`/
+`VAPID_SUBJECT`, since `createSessionCookie` needs a real `SESSION_SECRET` or
+auth 500s) and `scripts/shot.mjs` (claims-or-logs-in against local D1, carries
+the `uc_session` cookie into puppeteer, then screenshots a given hash route;
+puppeteer resolves from `Websites/node_modules` via Node's parent-directory
+walk, nothing installed here). Both captures used `MSYS_NO_PATHCONV=1` per the
+known Git Bash MSYS `#/...` argument-mangling gotcha.
+
+Found a gap in the brief's own step 4c verification recipe: the sample-deal
+`INSERT` only touches the `deals` table, leaving `deal_events` and
+`reference_prices` empty in local D1. Since `screenDeal`'s price-history bar
+chart only renders when `events.length > 1` and the low/typical/now line only
+renders when `reference` is non-null, following the brief's seed command
+verbatim would have produced a deal-detail screenshot silently missing two of
+the three things "what the screens must show" explicitly requires. Fixed by
+seeding five extra `deal_events` rows (a descending price trail ending at the
+deal's current price) and one `reference_prices` row using the existing
+`seed/reference-prices.json` values for `monitor:27:1440p:240hz` before
+capturing, so the chart and reference line are both actually exercised in the
+screenshot rather than trusted on faith. Also inserted two more sample deals
+at different score tiers (82 amber, 64 dim, alongside the original 100 green)
+before the feed capture, since a single-row feed can't visually prove the
+score gutter's three-way colour coding is a real fixed column rather than an
+accident of one row's markup.
+
+Screenshots (`undercut-feed.png`, `undercut-deal.png`) committed alongside the
+code. Feed: sticky top bar (`UNDERCUT` / `4 SRC OK` in green), fixed
+`SCR`/`ITEM`/`PRICE` header, three rows with the score gutter colour-correct
+(100 green, 82 amber, 64 dim), tabular-nums prices right-aligned with a
+struck-through was-price beneath, condition suffix (`/ refurb`) appended only
+when not `new`. Deal detail: plain title, large tabular-nums hero price with
+struck was-price, "WHY THIS FIRED" itemised reasons grid (label / signed
+points / detail, points coloured green), a "SCORE 100 capped from 114" total
+row proving the >100-cap annotation actually fires, a five-bar price-history
+spark chart with the current price bar highlighted green, and a "LOW $198 /
+TYPICAL $320 / NOW $60" reference line. No cards, no pill buttons, no
+gradients, nothing centred; monospace throughout. Full description and
+self-review in `.superpowers/sdd/2026-07-25-undercut-implementation/task-17-report.md`.
+
 Task 16 done: the read and settings API. `src/api/feed.js` exposes
 `routeFeed` (`GET /api/feed?minScore=&limit=`, `GET /api/deal/:id`);
 `src/api/settings.js` exposes `routeSettings` (`GET|PATCH /api/settings`,
@@ -156,7 +209,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T14 poll pipeline
 - [x] T15 auth api
 - [x] T16 read api
-- [ ] T17 feed + detail UI
+- [x] T17 feed + detail UI
 - [ ] T18 settings UI
 - [ ] T19 PWA shell + push
 - [ ] T20 cron-pinger
@@ -200,6 +253,11 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
   entirely; no test-harness workaround was needed here. Verified 15 tests pass
   (12 ebayAdapter + 3 adapter registry), not the "14 tests" the brief's prose
   estimated.
+- Task 17: the brief's own step 4c seed command only inserts into `deals`,
+  leaving `deal_events` and `reference_prices` empty locally, so the
+  price-history chart and the low/typical/now reference line (both explicitly
+  required by "what the screens must show") would not render if followed
+  literally. Seeded both tables manually before capturing; see Status above.
 - Task 15: adding the global session gate changed the true status code for
   unauthenticated requests to unknown `/api/*` paths from 404 (Task 1's
   assumption, written before auth existed) to 401 (the gate now runs before
