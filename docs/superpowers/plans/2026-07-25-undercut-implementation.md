@@ -5435,7 +5435,9 @@ git commit -m "feat: add ticker design system with feed and deal detail screens"
 
 **Interfaces:**
 - Consumes: `GET|PATCH /api/settings`, `GET|POST /api/watchlist`, `DELETE /api/watchlist/:id`, `GET|POST /api/rules`, `DELETE /api/rules/:id`, `POST /api/sources/:id/enable`, and the push endpoints from Task 16
-- Produces: the `#/settings` screen. `enablePush()` is defined here and reused by Task 19.
+- Produces: the `#/settings` screen. It *calls* `enablePush()`, which Task 19
+  defines. Until T19 lands the identifier does not exist, so the button must be
+  wired through a closure (see the step below) rather than by direct reference.
 
 Source health goes first on this screen. That ordering is deliberate: a silently dead source is the failure mode that costs Samuel deals, so it must be the first thing he sees.
 
@@ -5515,7 +5517,11 @@ async function screenSettings() {
     b.onclick = async () => { await api(`/api/sources/${b.dataset.enable}/enable`, { method: "POST" }); route(); };
   });
 
-  document.getElementById("push").onclick = enablePush;
+  // Deferred as a closure, NOT `onclick = enablePush`. Task 19 defines
+  // enablePush; until then a bare reference is evaluated the moment this line
+  // runs, throwing a ReferenceError at RENDER time and blanking the whole
+  // settings screen rather than failing harmlessly on click.
+  document.getElementById("push").onclick = () => enablePush();
 }
 ```
 
