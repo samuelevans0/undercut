@@ -32,6 +32,20 @@ const ago = (sec) => {
 const scoreClass = (n) => (n >= 90 ? "good" : n >= 78 ? "warm" : "");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+// Only http(s) links are ever clickable. esc() stops attribute breakout but
+// leaves a `javascript:` scheme intact, and deal.url arrives straight from
+// third-party feeds. No base URL on purpose: feed links are always absolute,
+// so anything relative or malformed is rejected rather than silently
+// resolving against our own origin.
+const safeUrl = (u) => {
+  try {
+    const parsed = new URL(String(u ?? ""));
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
+};
+
 async function paintStatus() {
   try {
     const { sources } = await api("/api/settings");
@@ -96,7 +110,12 @@ async function screenDeal(id) {
     ${reference ? `<div style="padding:8px 12px 0;font-size:9.5px;color:var(--dim)">
       LOW ${money(reference.floor_cents)} / TYPICAL ${money(reference.typical_cents)} / NOW ${money(deal.price_cents)}
     </div>` : ""}
-    <a class="btn" href="${esc(deal.url)}" target="_blank" rel="noopener">OPEN AT RETAILER</a>
+    ${(() => {
+      const href = safeUrl(deal.url);
+      return href
+        ? `<a class="btn" href="${esc(href)}" target="_blank" rel="noopener">OPEN AT RETAILER</a>`
+        : `<div class="btn ghost" style="cursor:default">LINK UNAVAILABLE</div>`;
+    })()}
     <a class="btn ghost" href="#/">BACK TO FEED</a>`;
 }
 
@@ -125,11 +144,17 @@ async function route() {
   const hash = location.hash || "#/";
   try {
     if (hash === "#/login") return await screenLogin();
+
+    // Status belongs to the chrome, not to the feed screen. Painting it only
+    // in the feed branch left the bar reading "..." on every other route.
+    // Deliberately not awaited: it has its own try/catch and must not delay
+    // the screen render.
+    paintStatus();
+
     const deal = hash.match(/^#\/deal\/(\d+)$/);
     if (deal) return await screenDeal(deal[1]);
     if (hash === "#/settings") return await screenSettings();
     await screenFeed();
-    await paintStatus();
   } catch (e) {
     if (e.message !== "unauthorized") app.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
   }

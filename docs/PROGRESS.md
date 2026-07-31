@@ -59,6 +59,24 @@ TYPICAL $320 / NOW $60" reference line. No cards, no pill buttons, no
 gradients, nothing centred; monospace throughout. Full description and
 self-review in `.superpowers/sdd/2026-07-25-undercut-implementation/task-17-report.md`.
 
+Review round 1 fixed two findings in `app.js`. (1) Important: `esc()` stops
+attribute breakout on `href="${esc(deal.url)}"` but leaves a `javascript:`
+scheme intact, and `deal.url` arrives straight from third-party feeds (RSS
+`<link>` is the realistic vector). Added a `safeUrl()` helper next to `esc`
+that parses the URL and only returns it when the scheme is `http:`/`https:`,
+returning `null` otherwise; `screenDeal` now renders "OPEN AT RETAILER" only
+when `safeUrl(deal.url)` is non-null, falling back to a non-interactive
+"LINK UNAVAILABLE" ghost block. Fixed at render time rather than ingestion
+because render is the last line of defence and also covers rows already
+sitting in the database. (2) Minor: `paintStatus()` was only ever called from
+the feed branch of `route()`, so `#/deal/:id` and `#/settings` left the top
+bar reading the literal `...` placeholder, visible in the first round's
+committed deal screenshot. Moved the (deliberately un-awaited) `paintStatus()`
+call to run once in `route()` for every non-login route, since status belongs
+to the persistent chrome, not to one screen. Both screenshots re-captured;
+the deal detail top bar now reads "4 SRC OK" instead of "...". 257 tests still
+green, unchanged (no test files touched, both fixes are presentation-layer).
+
 Task 16 done: the read and settings API. `src/api/feed.js` exposes
 `routeFeed` (`GET /api/feed?minScore=&limit=`, `GET /api/deal/:id`);
 `src/api/settings.js` exposes `routeSettings` (`GET|PATCH /api/settings`,
