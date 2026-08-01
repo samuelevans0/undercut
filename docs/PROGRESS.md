@@ -385,23 +385,27 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
   own `heatFor`: flooring the age denominator to 1 minute for a zero-age post
   manufactures a fake velocity instead of signalling "no data yet"; fixed by
   gating on elapsed time instead (see Status above for the full story).
-- Task 19: the brief's verbatim `sw.js` precaches `/` and serves it cache-first
-  on every subsequent same-origin GET (`caches.match(e.request).then((hit) =>
-  hit || fetch(...))`), which is exactly the pattern flagged in
+- Task 19: the brief's verbatim `sw.js` originally precached `/` and served it
+  cache-first on every subsequent same-origin GET (`caches.match(e.request)
+  .then((hit) => hit || fetch(...))`), which is exactly the pattern flagged in
   `ClaudeBrain/Knowledge/Service worker caching the HTML shell strands users on
-  old builds.md` as able to pin visitors to a stale HTML document until the
-  cache name bumps. That note is itself marked superseded as the *cause* of
-  its origin bug (the real cause there was cross-origin proxying, which this
-  brief's three bail-out guards already prevent), but it documents a real,
-  separate risk that still applies here: between a deploy and a visitor's next
-  full SW update cycle, a navigation can be answered from the old cached `/`.
-  Implemented the brief's `sw.js` verbatim per the task's explicit instruction
-  (not modified), and the versioned `CACHE = "undercut-v1"` name plus the
-  `activate` handler's purge-old-caches step already provide the documented
-  mitigation (bump the cache name on any shell-affecting deploy) — flagging
-  this here rather than silently leaving it undocumented, and noting it for
-  the deploy task: bump `CACHE` to `-v2` etc. whenever `index.html`/`app.css`/
-  `app.js` changes ship.
+  old builds.md` as able to pin visitors to a stale HTML document. That note
+  is itself marked superseded as the *cause* of its origin bug (the real
+  cause there was cross-origin proxying, which this brief's three bail-out
+  guards already prevent), but it documents a real, separate risk that still
+  applied here. Flagged rather than shipped silently; fix round 1 replaced
+  it outright with network-first, cache-as-offline-fallback (`fetch(e.request)
+  .then(res => { if (res.ok) cache.put(...); return res; }).catch(() =>
+  caches.match(e.request).then(hit => hit || Response.error()))`), so an
+  installed PWA now always gets the current `app.js`/`app.css`/`index.html`
+  when online, with the cache only ever used as a genuine-offline fallback.
+  This removes the need for the manual "bump `CACHE` on every shell-affecting
+  deploy" mitigation entirely: freshness no longer depends on remembering to
+  rename the cache. The three bail-out guards (cross-origin, non-GET, `/api/`)
+  and the `install` precache / `activate` purge are unchanged; the
+  cross-origin guard specifically stays because a service worker `fetch()` is
+  governed by the page's CSP `connect-src`, not `script-src`, and proxying a
+  third-party request through it silently breaks it from the second visit on.
 
 ## Assumptions to verify (from spec section 17)
 - [ ] Per-source fan-out keeps each poll inside the free-tier CPU allowance.

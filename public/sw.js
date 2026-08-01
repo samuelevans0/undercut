@@ -21,14 +21,22 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/")) return;
 
+  // Network first, cache only as the offline fallback. Cache-first would
+  // strand an installed PWA on whatever shell it saw the day it was
+  // installed: a deploy changing app.js would never reach it unless CACHE
+  // were bumped by hand, and a byte-identical sw.js would not even trigger
+  // an update check. Freshness matters more here than a few hundred ms, and
+  // the cache still covers being genuinely offline.
   e.respondWith(
-    caches.match(e.request).then((hit) =>
-      hit || fetch(e.request).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+    fetch(e.request)
+      .then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        }
         return res;
       })
-    )
+      .catch(() => caches.match(e.request).then((hit) => hit || Response.error()))
   );
 });
 
