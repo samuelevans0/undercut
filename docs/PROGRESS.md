@@ -6,6 +6,52 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 19 done: the PWA shell, icons, service worker, and push subscription.
+`scripts/make-icons.mjs` writes two dependency-free PNGs (`public/icons/icon-192.png`,
+`icon-512.png`) directly with `node:zlib`'s `deflateSync` and a hand-rolled CRC32
+table, no image libraries; the mark is a dark (`#0b0b0c`) square with a green
+(`#4ad07a`) bar down the left edge, echoing the ticker score gutter. Ran it and
+opened both PNGs: both render as the intended dark-square-with-green-bar image,
+not corrupt bytes. `public/manifest.webmanifest` (standalone display, both icon
+sizes) and `public/sw.js` are new; `public/index.html` already linked the
+manifest, apple-touch-icon, and `apple-mobile-web-app-capable` meta tags from
+an earlier task, so no HTML changes were needed. `sw.js`'s fetch handler keeps
+all three bail-out guards from the brief: cross-origin (`url.origin !==
+location.origin`), non-GET, and `/api/` paths all return early and let the
+browser handle the request directly, untouched by the worker — the
+cross-origin guard specifically exists because a service worker `fetch()` is
+governed by the page's CSP `connect-src`, not `script-src`, and proxying a
+third-party request through it silently breaks after the first visit (see
+`ClaudeBrain/Knowledge/Service worker proxying cross-origin requests gets them
+CSP-blocked.md`, which documents this taking four wrong fixes to diagnose on a
+sibling project). `push` and `notificationclick` handlers show a same-origin,
+text-only notification and open the deal URL on click. `public/app.js` gained
+`urlBase64ToUint8Array`, `enablePush` (checks `serviceWorker`/`PushManager`
+support, requests `Notification` permission, fetches the VAPID public key from
+`/api/push/key`, subscribes with `userVisibleOnly: true`, POSTs the
+subscription to `/api/push/subscribe`, and writes a plain-language result into
+`#pushmsg` for every one of the four failure paths — unsupported browser,
+permission denied, no server-side VAPID key, and subscribe/network failure —
+instead of ever surfacing a stack trace) and unconditional service worker
+registration (`navigator.serviceWorker.register("/sw.js")`, swallowing
+registration failure). `enablePush` is a hoisted function declaration, so
+Task 18's `() => enablePush()` closure now resolves correctly instead of
+throwing. `scripts/generate-vapid.mjs` is a one-shot ECDSA P-256 keypair
+generator using WebCrypto, run manually via `npm run vapid`; ran it once to
+confirm it produces a 65-byte-raw base64url public key and a JSON private JWK
+in real Node (v24.15.0), zero dependencies. `src/lib/webpush.js` (the RFC 8291
+`aes128gcm` push crypto) was not touched. 260 tests green (257 prior + 3 new
+`tests/vapid.test.js`: public key length/shape, ES256 VAPID auth header
+claims, and the RFC 8188 `aes128gcm` header layout on `encryptPushPayload`'s
+output). Confirmed the test file is a meaningful check, not vacuously true, by
+temporarily changing the header-layout assertion's expected key-length byte
+from 65 to 64 and re-running: it failed with `AssertionError: expected 65 to
+be 64` while the other two tests still passed, then reverted to the correct
+verbatim assertion for a clean 3/3 pass; `src/lib/webpush.js` itself was never
+edited. No manual iPhone verification performed (requires a deployed HTTPS
+origin and adding to a physical device's home screen); flagged for the deploy
+task per the brief's own "manual iPhone verification at deploy time" line.
+
 Task 18 done: the settings screen (`public/app.js`'s `screenSettings`,
 replacing the T17 stub) and a `#/settings` link added to the top bar
 (`public/index.html`). Five sections in the deliberate order the brief calls
@@ -262,7 +308,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T16 read api
 - [x] T17 feed + detail UI
 - [x] T18 settings UI
-- [ ] T19 PWA shell + push
+- [x] T19 PWA shell + push
 - [ ] T20 cron-pinger
 - [ ] T21 deploy runbook
 
@@ -339,6 +385,23 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
   own `heatFor`: flooring the age denominator to 1 minute for a zero-age post
   manufactures a fake velocity instead of signalling "no data yet"; fixed by
   gating on elapsed time instead (see Status above for the full story).
+- Task 19: the brief's verbatim `sw.js` precaches `/` and serves it cache-first
+  on every subsequent same-origin GET (`caches.match(e.request).then((hit) =>
+  hit || fetch(...))`), which is exactly the pattern flagged in
+  `ClaudeBrain/Knowledge/Service worker caching the HTML shell strands users on
+  old builds.md` as able to pin visitors to a stale HTML document until the
+  cache name bumps. That note is itself marked superseded as the *cause* of
+  its origin bug (the real cause there was cross-origin proxying, which this
+  brief's three bail-out guards already prevent), but it documents a real,
+  separate risk that still applies here: between a deploy and a visitor's next
+  full SW update cycle, a navigation can be answered from the old cached `/`.
+  Implemented the brief's `sw.js` verbatim per the task's explicit instruction
+  (not modified), and the versioned `CACHE = "undercut-v1"` name plus the
+  `activate` handler's purge-old-caches step already provide the documented
+  mitigation (bump the cache name on any shell-affecting deploy) — flagging
+  this here rather than silently leaving it undocumented, and noting it for
+  the deploy task: bump `CACHE` to `-v2` etc. whenever `index.html`/`app.css`/
+  `app.js` changes ship.
 
 ## Assumptions to verify (from spec section 17)
 - [ ] Per-source fan-out keeps each poll inside the free-tier CPU allowance.

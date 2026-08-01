@@ -1,6 +1,45 @@
 const app = document.getElementById("app");
 const statusEl = document.getElementById("status");
 
+function urlBase64ToUint8Array(base64) {
+  const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(padded);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function enablePush() {
+  const msg = document.getElementById("pushmsg");
+  const say = (t) => { if (msg) msg.textContent = t; };
+
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return say("This browser cannot do push. On iPhone, add Undercut to your home screen and open it from there.");
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") return say("Notifications are blocked. Enable them in your device settings.");
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const { publicKey } = await api("/api/push/key");
+    if (!publicKey) return say("No VAPID key is configured on the server.");
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+    const json = sub.toJSON();
+    await api("/api/push/subscribe", {
+      method: "POST",
+      body: { endpoint: json.endpoint, keys: json.keys },
+    });
+    say("Push is on for this device.");
+  } catch (e) {
+    say(`Could not enable push: ${e.message}`);
+  }
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
 async function screenSettings() {
   const [{ prefs, sources }, { watchlist }, { rules }] = await Promise.all([
     api("/api/settings"), api("/api/watchlist"), api("/api/rules"),
