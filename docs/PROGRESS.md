@@ -6,6 +6,35 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 20 done: the cron-pinger Worker. `cron-pinger/worker.js` exports a
+`scheduled(event, env, ctx, fetchImpl = fetch)` handler that fans out one
+signed POST per source (`reddit`, `slickdeals`, `woot`, `ebay`) to
+`/api/poll/:sourceId`, in parallel via `Promise.allSettled`, each call wrapped
+in its own try/catch so one failing source (confirmed with a test that throws
+specifically on the reddit request) never stops the other three. The origin is
+normalised with `env.UNDERCUT_ORIGIN.replace(/\/+$/, "")` before the path is
+appended, so a dashboard-configured origin with a trailing slash can never
+produce `/api/poll/reddit/` (which would 405 off the static-asset fallback
+instead of reaching the Function). Missing `UNDERCUT_ORIGIN` or `POLL_SECRET`
+logs via `console.error` and returns without calling `fetchImpl` at all,
+verified by the "throws nothing when configuration is missing" test. The file
+has zero imports by design: it reimplements `hmacHex` inline rather than
+importing `src/lib/crypto.js`, because this exact file gets pasted whole into
+the Cloudflare dashboard (Pages-scoped tokens can't deploy Workers, and
+staying import-free is what avoids needing a Workers-scoped one) — a
+deliberate, owner-approved duplication, not an oversight. The drift risk that
+duplication creates is handled by the test, not by inspection: `tests/pinger.test.js`
+signs with the pinger's own `hmacHex` and verifies every request with the real
+`verifyPollRequest` imported from `src/lib/hmac-auth.js`, so any future
+divergence between the two implementations fails the suite instead of failing
+silently in production. `cron-pinger/wrangler.toml` (name `undercut-pinger`,
+`* * * * *` cron trigger) and `cron-pinger/DASHBOARD-PASTE.md` (paste steps,
+the "variables aren't live until you click Deploy" gotcha, and the
+`wrangler d1 execute ... SELECT last_polled_at` verification command) are
+present per the brief; neither is exercised by tests, both are deploy-time
+artifacts read by the operator. 265 tests green (260 prior + 5 new
+`tests/pinger.test.js`).
+
 Task 19 done: the PWA shell, icons, service worker, and push subscription.
 `scripts/make-icons.mjs` writes two dependency-free PNGs (`public/icons/icon-192.png`,
 `icon-512.png`) directly with `node:zlib`'s `deflateSync` and a hand-rolled CRC32
@@ -309,7 +338,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T17 feed + detail UI
 - [x] T18 settings UI
 - [x] T19 PWA shell + push
-- [ ] T20 cron-pinger
+- [x] T20 cron-pinger
 - [ ] T21 deploy runbook
 
 ## Gotchas found
