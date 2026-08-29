@@ -1,0 +1,47 @@
+[
+  {
+    "OfferId": "2a3deba2-6f5a-43df-875a-ea84709c9a30",
+    "Title": "LG 27GR83Q 27\" 1440p 240Hz IPS Gaming Monitor",
+    "Condition": "New",
+    "Categories": ["Computers", "Computers/Monitors"],
+    "Url": "https://computers.woot.com/offers/lg-27gr83q-monitor",
+    "ForumUrl": "https://forums.woot.com/t/12345",
+    "IsSoldOut": false,
+    "IsFeatured": false,
+    "IsWootOff": false,
+    "StartDate": "2027-01-15T08:00:00.000Z",
+    "EndDate": "2027-01-16T08:00:00.000Z",
+    "ListPrice": { "Minimum": 399.99, "Maximum": 399.99 },
+    "SalePrice": { "Minimum": 59.99, "Maximum": 59.99 }
+  },
+  {
+    "OfferId": "33fb06a8-6c83-47c6-bcdc-ddf8d6780dea",
+    "Title": "Refurbished Mechanical Keyboard RGB",
+    "Condition": "Refurbished",
+    "Categories": ["Computers", "Computers/Keyboards"],
+    "Url": "https://computers.woot.com/offers/refurb-keyboard",
+    "ForumUrl": "https://forums.woot.com/t/12346",
+    "IsSoldOut": false,
+    "IsFeatured": false,
+    "IsWootOff": false,
+    "StartDate": "2027-01-15T09:00:00.000Z",
+    "EndDate": "2027-01-16T09:00:00.000Z",
+    "ListPrice": { "Minimum": 89.99, "Maximum": 89.99 },
+    "SalePrice": { "Minimum": 39.99, "Maximum": 39.99 }
+  },
+  {
+    "OfferId": "sold-out-0000-0000-0000-000000000000",
+    "Title": "Sold Out Graphics Card",
+    "Condition": "New",
+    "Categories": ["Computers"],
+    "Url": "https://computers.woot.com/offers/sold-out-gpu",
+    "ForumUrl": "https://forums.woot.com/t/12347",
+    "IsSoldOut": true,
+    "IsFeatured": false,
+    "IsWootOff": false,
+    "StartDate": "2027-01-14T08:00:00.000Z",
+    "EndDate": "2027-01-15T08:00:00.000Z",
+    "ListPrice": { "Minimum": 599.99, "Maximum": 599.99 },
+    "SalePrice": { "Minimum": 349.99, "Maximum": 349.99 }
+  }
+]

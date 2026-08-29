@@ -68,9 +68,14 @@ export async function pollSource(env, sourceId, nowSec, deps = {}) {
   const watchlist = await listWatchlist(env.DB);
   const rules = await listRules(env.DB);
 
-  // eBay searches one watchlist query per poll to stay inside its daily budget.
+  // eBay searches one of its own configured queries per poll to stay inside
+  // its daily budget. This is deliberately independent of the watchlist:
+  // watchlist entries force a notify regardless of score (see below), so
+  // wiring eBay's broad "what to scan" list into the same table used to mean
+  // any listing merely containing all the words in a broad term (e.g. both
+  // "graphics" and "card" anywhere in the title) force-notified regardless of
+  // whether it was actually a good deal.
   if (sourceId === "ebay") {
-    config.queries = watchlist.map((w) => w.query).filter(Boolean);
     config.cursor = Number.isFinite(config.cursor) ? config.cursor : 0;
   }
 
@@ -177,7 +182,7 @@ export async function pollSource(env, sourceId, nowSec, deps = {}) {
     config.cursor = (config.cursor + 1) % config.queries.length;
     await env.DB
       .prepare("UPDATE sources SET config_json = ? WHERE id = 'ebay'")
-      .bind(JSON.stringify({ ...config, queries: undefined }))
+      .bind(JSON.stringify(config))
       .run();
   }
 

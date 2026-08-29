@@ -13,6 +13,8 @@ export default defineConfig({
           VAPID_PUBLIC_KEY: "test-vapid-public",
           VAPID_PRIVATE_KEY: "{}",
           VAPID_SUBJECT: "mailto:push@undercut.test",
+          EBAY_CLIENT_ID: "test-ebay-id",
+          EBAY_CLIENT_SECRET: "test-ebay-secret",
         },
       },
     }),

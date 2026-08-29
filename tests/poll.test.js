@@ -135,6 +135,45 @@ describe("pollSource", () => {
   });
 });
 
+describe("pollSource ebay query wiring", () => {
+  function fakeEbayFetch(expectedQuery, itemSummaries) {
+    return vi.fn(async (url) => {
+      if (String(url).includes("oauth2/token")) return Response.json({ access_token: "t", expires_in: 7200 });
+      if (String(url).includes("item_summary/search")) {
+        const q = new URL(String(url)).searchParams.get("q");
+        return Response.json({ total: q === expectedQuery ? itemSummaries.length : 0, itemSummaries: q === expectedQuery ? itemSummaries : [] });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+  }
+
+  const widgetItem = [{ itemId: "v1|1|0", title: "Widget Pro - $40", price: { value: "40.00", currency: "USD" }, itemWebUrl: "https://ebay.test/1", condition: "New", itemCreationDate: "2027-01-15T08:00:00Z" }];
+
+  it("searches its own config_json queries, not the watchlist", async () => {
+    await env.DB.prepare("UPDATE sources SET config_json = ? WHERE id = 'ebay'").bind(JSON.stringify({ queries: ["widget"], cursor: 0 })).run();
+    await env.DB.prepare("INSERT INTO watchlist (label, query, created_at) VALUES ('unrelated','gizmo',?)").bind(NOW).run();
+    const r = await pollSource(env, "ebay", NOW, { fetchImpl: fakeEbayFetch("widget", widgetItem), sendImpl: async () => ({ ok: true }) });
+    expect(r.status).toBe("ok");
+    expect(r.seen).toBe(1);
+  });
+
+  it("a broad watchlist entry does not gate what ebay searches for", async () => {
+    await env.DB.prepare("UPDATE sources SET config_json = ? WHERE id = 'ebay'").bind(JSON.stringify({ queries: ["widget"], cursor: 0 })).run();
+    await env.DB.prepare("INSERT INTO watchlist (label, query, created_at) VALUES ('broad','pro',?)").bind(NOW).run();
+    const r = await pollSource(env, "ebay", NOW, { fetchImpl: fakeEbayFetch("widget", widgetItem), sendImpl: async () => ({ ok: true }) });
+    expect(r.seen).toBe(1);
+  });
+
+  it("keeps its query list across polls, only advancing the cursor", async () => {
+    await env.DB.prepare("UPDATE sources SET config_json = ? WHERE id = 'ebay'").bind(JSON.stringify({ queries: ["widget", "gadget"], cursor: 0 })).run();
+    await pollSource(env, "ebay", NOW, { fetchImpl: fakeEbayFetch("widget", widgetItem), sendImpl: async () => ({ ok: true }) });
+    await env.DB.prepare("UPDATE sources SET last_polled_at = NULL WHERE id = 'ebay'").run();
+    const r = await pollSource(env, "ebay", NOW + 1, { fetchImpl: fakeEbayFetch("gadget", widgetItem), sendImpl: async () => ({ ok: true }) });
+    expect(r.status).toBe("ok");
+    expect(r.seen).toBe(1);
+  });
+});
+
 describe("POST /api/poll/:source", () => {
   async function call(path, headers) {
     const req = new Request(`https://undercut.test${path}`, { method: "POST", headers });

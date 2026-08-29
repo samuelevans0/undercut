@@ -9,4 +9,4 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "undercut-db"
-database_id = "local"
+database_id = "64fd8cdb-c96e-491e-9a88-6388b7d0e570"

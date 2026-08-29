@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { parseRss } from "../src/sources/rss.js";
 import { slickdealsAdapter } from "../src/sources/slickdeals.js";
-import { wootAdapter } from "../src/sources/woot.js";
 // The brief's fixture loader was `readFileSync(new URL(...), "utf8")`. That
 // cannot work in this environment: @cloudflare/vitest-pool-workers runs every
 // test file inside the workerd/Miniflare sandbox, whose virtualized node:fs
@@ -11,7 +10,6 @@ import { wootAdapter } from "../src/sources/woot.js";
 // import suffix resolves file content at transform time instead of through
 // runtime fs. Every it() block below is untouched.
 import slickXml from "./fixtures/slickdeals.xml?raw";
-import wootXml from "./fixtures/woot.xml?raw";
 
 const okWith = (body) => vi.fn(async () => new Response(body, { status: 200 }));
 
@@ -86,22 +84,5 @@ describe("slickdealsAdapter", () => {
   });
 });
 
-describe("wootAdapter", () => {
-  it("maps items and keeps the refurb wording in the title", async () => {
-    const items = await wootAdapter.list({}, {}, okWith(wootXml));
-    expect(items).toHaveLength(1);
-    expect(items[0].rawTitle).toMatch(/Refurbished/);
-    expect(items[0].externalId).toBe("woot-logitech-gpro");
-  });
-
-  it("fetches every configured feed", async () => {
-    const f = okWith(wootXml);
-    await wootAdapter.list({}, { feeds: ["computers", "electronics"] }, f);
-    expect(f).toHaveBeenCalledTimes(2);
-  });
-
-  it("throws on a failed fetch", async () => {
-    const f = vi.fn(async () => new Response("err", { status: 500 }));
-    await expect(wootAdapter.list({}, {}, f)).rejects.toThrow(/500/);
-  });
-});
+// wootAdapter now reads Woot's real developer API, not RSS. Its own coverage
+// lives in tests/source-woot.test.js.
