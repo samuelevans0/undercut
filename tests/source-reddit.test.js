@@ -1,116 +1,80 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { redditAdapter, _resetTokenCache } from "../src/sources/reddit.js";
-import fixture from "./fixtures/reddit-buildapcsales.json";
+import { describe, it, expect, vi } from "vitest";
+import { redditAdapter } from "../src/sources/reddit.js";
+import atomXml from "./fixtures/reddit-buildapcsales.atom.xml?raw";
 
-const env = { REDDIT_CLIENT_ID: "id", REDDIT_CLIENT_SECRET: "secret" };
-
-// The token cache is module scope, so it survives between tests in this file.
-// Without this, whichever test runs second sees a warm token and the
-// "sends basic auth to the token endpoint" assertion finds no token call.
-beforeEach(() => _resetTokenCache());
-
-function fakeFetch(handlers) {
-  return vi.fn(async (url, init) => {
-    for (const [pattern, fn] of handlers) {
-      if (String(url).includes(pattern)) return fn(url, init);
-    }
-    throw new Error(`unexpected fetch: ${url}`);
-  });
-}
-
-const tokenOk = ["access_token", async () => Response.json({ access_token: "tok", expires_in: 3600 })];
-const listingOk = ["oauth.reddit.com", async () => Response.json(fixture)];
+const okWith = (body) => vi.fn(async () => new Response(body, { status: 200, headers: { "content-type": "application/atom+xml" } }));
 
 describe("redditAdapter", () => {
-  it("returns one item per post", async () => {
-    const items = await redditAdapter.list(env, { subreddits: ["buildapcsales"] }, fakeFetch([tokenOk, listingOk]));
-    expect(items).toHaveLength(3);
+  it("returns one item per entry", async () => {
+    const items = await redditAdapter.list({}, { subreddits: ["buildapcsales"] }, okWith(atomXml));
+    expect(items).toHaveLength(4);
   });
 
   it("maps fields into the RawItem shape", async () => {
-    const items = await redditAdapter.list(env, { subreddits: ["buildapcsales"] }, fakeFetch([tokenOk, listingOk]));
+    const items = await redditAdapter.list({}, { subreddits: ["buildapcsales"] }, okWith(atomXml));
     const first = items[0];
     expect(first.externalId).toBe("t3_abc123");
-    expect(first.rawTitle).toContain("LG 27GR83Q");
+    expect(first.rawTitle).toBe('[Monitor] LG 27GR83Q 27" 1440p 240Hz - $60 (Amazon)');
     expect(first.url).toBe("https://www.amazon.com/dp/B0EXAMPLE");
     expect(first.tag).toBe("Monitor");
-    expect(first.postedAt).toBe(1800000000);
-    expect(first.upvotes).toBe(340);
-    expect(first.comments).toBe(41);
+    expect(first.postedAt).toBe(Math.floor(Date.parse("2026-01-15T12:00:00+00:00") / 1000));
+    expect(first.upvotes).toBe(null);
+    expect(first.comments).toBe(null);
     expect(first.sellerRating).toBe(null);
   });
 
-  it("prefers the title tag over the flair", async () => {
-    const custom = structuredClone(fixture);
-    custom.data.children[0].data.link_flair_text = "Wrong";
-    const items = await redditAdapter.list(env, { subreddits: ["x"] }, fakeFetch([tokenOk, ["oauth", async () => Response.json(custom)]]));
-    expect(items[0].tag).toBe("Monitor");
+  it("unescapes entities in the title", async () => {
+    const items = await redditAdapter.list({}, { subreddits: ["buildapcsales"] }, okWith(atomXml));
+    expect(items[1].rawTitle).toBe("[SSD] Samsung 1TB - $70 - Best Buy & Amazon");
+    expect(items[1].tag).toBe("SSD");
+    expect(items[1].url).toBe("https://www.bestbuy.com/site/example");
   });
 
-  it("falls back to the flair when the title has no tag", async () => {
-    const custom = structuredClone(fixture);
-    custom.data.children[0].data.title = "LG monitor deal - $60";
-    const items = await redditAdapter.list(env, { subreddits: ["x"] }, fakeFetch([tokenOk, ["oauth", async () => Response.json(custom)]]));
-    expect(items[0].tag).toBe("Monitor");
+  it("sets tag to null when the title has no bracket prefix", async () => {
+    const items = await redditAdapter.list({}, { subreddits: ["buildapcsales"] }, okWith(atomXml));
+    expect(items[2].tag).toBe(null);
+    expect(items[2].rawTitle).toBe("Great deal on a mechanical keyboard - $40");
   });
 
-  it("sends basic auth to the token endpoint", async () => {
-    const f = fakeFetch([tokenOk, listingOk]);
-    await redditAdapter.list(env, { subreddits: ["x"] }, f);
-    const tokenCall = f.mock.calls.find((c) => String(c[0]).includes("access_token"));
-    expect(tokenCall[1].headers.authorization).toBe(`Basic ${btoa("id:secret")}`);
-    expect(tokenCall[1].headers["user-agent"]).toMatch(/undercut/i);
+  it("falls back to the entry's own reddit link when content has no outbound [link] anchor", async () => {
+    const items = await redditAdapter.list({}, { subreddits: ["buildapcsales"] }, okWith(atomXml));
+    const discussion = items[3];
+    expect(discussion.externalId).toBe("t3_jkl000");
+    expect(discussion.url).toBe("https://www.reddit.com/r/buildapcsales/comments/jkl000/discussion_thread/");
   });
 
   it("reads multiple subreddits", async () => {
-    const f = fakeFetch([tokenOk, listingOk]);
-    const items = await redditAdapter.list(env, { subreddits: ["a", "b"] }, f);
-    expect(items).toHaveLength(6);
-    const listingCalls = f.mock.calls.filter((c) => String(c[0]).includes("oauth"));
-    expect(listingCalls).toHaveLength(2);
-  });
-
-  it("reuses a cached token across calls", async () => {
-    const f = fakeFetch([tokenOk, listingOk]);
-    await redditAdapter.list(env, { subreddits: ["a"] }, f);
-    await redditAdapter.list(env, { subreddits: ["a"] }, f);
-    const tokenCalls = f.mock.calls.filter((c) => String(c[0]).includes("access_token"));
-    expect(tokenCalls).toHaveLength(1);
-  });
-
-  it("throws when credentials are missing", async () => {
-    await expect(redditAdapter.list({}, { subreddits: ["a"] }, fakeFetch([]))).rejects.toThrow(/credential/i);
-  });
-
-  it("throws when the token request fails", async () => {
-    const f = fakeFetch([["access_token", async () => new Response("nope", { status: 401 })]]);
-    await expect(redditAdapter.list(env, { subreddits: ["a"] }, f)).rejects.toThrow(/token/i);
-  });
-
-  it("throws when a listing request fails", async () => {
-    const f = fakeFetch([tokenOk, ["oauth", async () => new Response("nope", { status: 429 })]]);
-    await expect(redditAdapter.list(env, { subreddits: ["a"] }, f)).rejects.toThrow(/429/);
-  });
-
-  it("throws on a 200 that carries no children array", async () => {
-    // Reddit answers 200 with {"reason":"private"} for private/banned subs.
-    // Returning [] here would look exactly like a quiet day.
-    const f = fakeFetch([tokenOk, ["oauth", async () => Response.json({ reason: "private" })]]);
-    await expect(redditAdapter.list(env, { subreddits: ["a"] }, f)).rejects.toThrow(/children/i);
-  });
-
-  it("skips non-post children rather than emitting a degenerate item", async () => {
-    const custom = structuredClone(fixture);
-    custom.data.children.push({ kind: "more", data: { count: 12 } });
-    const f = fakeFetch([tokenOk, ["oauth", async () => Response.json(custom)]]);
-    const items = await redditAdapter.list(env, { subreddits: ["a"] }, f);
-    expect(items).toHaveLength(3);
-    expect(items.every((i) => !i.externalId.includes("undefined"))).toBe(true);
+    const f = okWith(atomXml);
+    const items = await redditAdapter.list({}, { subreddits: ["a", "b"] }, f);
+    expect(items).toHaveLength(8);
+    expect(f).toHaveBeenCalledTimes(2);
   });
 
   it("defaults to buildapcsales with no config", async () => {
-    const f = fakeFetch([tokenOk, listingOk]);
-    await redditAdapter.list(env, {}, f);
-    expect(f.mock.calls.some((c) => String(c[0]).includes("buildapcsales"))).toBe(true);
+    const f = okWith(atomXml);
+    await redditAdapter.list({}, {}, f);
+    expect(f.mock.calls[0][0]).toContain("buildapcsales");
+  });
+
+  it("requests the RSS endpoint with no query params, and no credentials", async () => {
+    const f = okWith(atomXml);
+    await redditAdapter.list({ REDDIT_CLIENT_ID: undefined, REDDIT_CLIENT_SECRET: undefined }, { subreddits: ["x"] }, f);
+    expect(f.mock.calls[0][0]).toBe("https://www.reddit.com/r/x/new.rss");
+  });
+
+  it("throws on a failed fetch", async () => {
+    const f = vi.fn(async () => new Response("err", { status: 403 }));
+    await expect(redditAdapter.list({}, { subreddits: ["a"] }, f)).rejects.toThrow(/403/);
+  });
+
+  it("throws when a 200 response is not a feed at all", async () => {
+    const f = vi.fn(async () => new Response("<!doctype html><html><body>Blocked</body></html>", { status: 200 }));
+    await expect(redditAdapter.list({}, { subreddits: ["a"] }, f)).rejects.toThrow(/did not return RSS/i);
+  });
+
+  it("allows a valid feed that genuinely has no entries", async () => {
+    const quiet = '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>quiet</title></feed>';
+    const f = vi.fn(async () => new Response(quiet, { status: 200 }));
+    await expect(redditAdapter.list({}, { subreddits: ["a"] }, f)).resolves.toEqual([]);
   });
 });

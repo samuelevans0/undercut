@@ -1,35 +1,32 @@
 // Dumb adapter. Fetches and shapes. Never scores, classifies, or writes.
+//
+// Reddit closed self-serve OAuth app registration in November 2025 (replaced
+// with a manual, ticketed approval process with no guaranteed turnaround).
+// This adapter reads the public, unauthenticated RSS/Atom feed instead —
+// `reddit.com/r/<sub>/new.rss` — which needs no credentials at all. A plain
+// URL with no query string; adding `?limit=` was observed tripping Reddit's
+// bot-detection into a 403 "Blocked" page during testing, so it is
+// deliberately left off and the feed's default page size (25) is accepted.
+//
+// The trade-off: the JSON API's `ups`/`num_comments` fields have no Atom
+// equivalent, so `upvotes`/`comments` are always null here. score.js already
+// treats a missing heat signal as "no activity data" (0 points), so this
+// degrades gracefully rather than breaking anything.
 
-const UA = "web:undercut:1.0 (private deal watcher)";
-const TOKEN_URL = "https://www.reddit.com/api/v1/access_token";
+import { fetchFeedText, unescapeXml } from "./rss.js";
 
-let cachedToken = null; // { value, expiresAt }
+const ENTRY_RE = /<entry>([\s\S]*?)<\/entry>/g;
+const LINK_RE = /<a\s+href="([^"]+)">\s*\[link\]\s*<\/a>/i;
 
-export function _resetTokenCache() {
-  cachedToken = null;
+function tag(block, name) {
+  const re = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, "i");
+  const m = block.match(re);
+  return m ? unescapeXml(m[1].trim()) : null;
 }
 
-async function getToken(env, fetchImpl) {
-  const now = Math.floor(Date.now() / 1000);
-  if (cachedToken && cachedToken.expiresAt > now + 60) return cachedToken.value;
-
-  if (!env.REDDIT_CLIENT_ID || !env.REDDIT_CLIENT_SECRET) {
-    throw new Error("reddit credentials missing");
-  }
-  const res = await fetchImpl(TOKEN_URL, {
-    method: "POST",
-    headers: {
-      authorization: `Basic ${btoa(`${env.REDDIT_CLIENT_ID}:${env.REDDIT_CLIENT_SECRET}`)}`,
-      "content-type": "application/x-www-form-urlencoded",
-      "user-agent": UA,
-    },
-    body: "grant_type=client_credentials",
-  });
-  if (!res.ok) throw new Error(`reddit token request failed: ${res.status}`);
-  const data = await res.json();
-  if (!data.access_token) throw new Error("reddit token missing from response");
-  cachedToken = { value: data.access_token, expiresAt: now + (data.expires_in ?? 3600) };
-  return cachedToken.value;
+function selfLink(block) {
+  const m = block.match(/<link\s+href="([^"]+)"\s*\/>/i);
+  return m ? m[1] : null;
 }
 
 function titleTag(title) {
@@ -37,15 +34,27 @@ function titleTag(title) {
   return m ? m[1].trim() : null;
 }
 
-function toRawItem(post) {
+function outboundUrl(contentHtml, fallback) {
+  if (!contentHtml) return fallback;
+  const m = contentHtml.match(LINK_RE);
+  return m ? m[1] : fallback;
+}
+
+function toRawItem(block) {
+  const title = tag(block, "title") ?? "";
+  const rawContent = tag(block, "content");
+  const link = selfLink(block);
   return {
-    externalId: `t3_${post.id}`,
-    rawTitle: post.title ?? "",
-    url: post.url ?? `https://www.reddit.com${post.permalink ?? ""}`,
-    tag: titleTag(post.title) ?? post.link_flair_text ?? null,
-    postedAt: Number.isFinite(post.created_utc) ? Math.round(post.created_utc) : null,
-    upvotes: Number.isFinite(post.ups) ? post.ups : null,
-    comments: Number.isFinite(post.num_comments) ? post.num_comments : null,
+    externalId: (tag(block, "id") ?? "").trim(),
+    rawTitle: title,
+    url: outboundUrl(rawContent, link ?? ""),
+    tag: titleTag(title),
+    postedAt: (() => {
+      const ms = Date.parse(tag(block, "published") ?? "");
+      return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+    })(),
+    upvotes: null,
+    comments: null,
     sellerRating: null,
   };
 }
@@ -56,29 +65,12 @@ export const redditAdapter = {
     const subs = Array.isArray(config.subreddits) && config.subreddits.length
       ? config.subreddits
       : ["buildapcsales"];
-    const token = await getToken(env, fetchImpl);
 
     const items = [];
     for (const sub of subs) {
-      const res = await fetchImpl(`https://oauth.reddit.com/r/${encodeURIComponent(sub)}/new?limit=50`, {
-        headers: { authorization: `Bearer ${token}`, "user-agent": UA },
-      });
-      if (!res.ok) throw new Error(`reddit listing failed for ${sub}: ${res.status}`);
-      const data = await res.json();
-
-      // A 200 with no children array is NOT an empty day. Reddit answers 200
-      // with `{"reason":"private"}` for private, quarantined and banned
-      // subreddits, and `?? []` would turn that into a silent zero-result poll
-      // that looks identical to nothing being posted. Throw so source health
-      // records it and the source eventually disables itself loudly.
-      const children = data?.data?.children;
-      if (!Array.isArray(children)) {
-        throw new Error(`reddit listing for ${sub} returned no children array (private, banned, or shape changed)`);
-      }
-
-      for (const child of children) {
-        // Skip "more" stubs and anything that is not a link post.
-        if (child?.kind === "t3" && child.data) items.push(toRawItem(child.data));
+      const text = await fetchFeedText(`https://www.reddit.com/r/${encodeURIComponent(sub)}/new.rss`, fetchImpl);
+      for (const match of text.matchAll(ENTRY_RE)) {
+        items.push(toRawItem(match[1]));
       }
     }
     return items;

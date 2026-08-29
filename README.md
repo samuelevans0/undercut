@@ -22,13 +22,16 @@ Tests: `npx vitest run`
 
 All free, all one-time.
 
-1. **Reddit OAuth app.** reddit.com/prefs/apps, Create App, type `script`.
-   Redirect URI can be `http://localhost`. Keep the client ID (under the app
-   name) and the secret.
-2. **eBay developer key.** developer.ebay.com, create a Production keyset.
+1. **eBay developer key.** developer.ebay.com, create a Production keyset.
    Keep the App ID (client ID) and Cert ID (client secret).
-3. **VAPID keys.** `npm run vapid`, keep both lines it prints.
-4. **A random `POLL_SECRET` and `SESSION_SECRET`.** Any long random strings.
+2. **VAPID keys.** `npm run vapid`, keep both lines it prints.
+3. **A random `POLL_SECRET` and `SESSION_SECRET`.** Any long random strings.
+
+Reddit needs no credentials — Reddit closed self-serve OAuth app registration
+in November 2025 (a manual, ticketed, no-guaranteed-turnaround process now),
+so this reads Reddit's public `new.rss` feed instead, which needs no key at
+all. Trade-off: no upvote/comment signal from Reddit, which only ever fed the
+optional "heat" score component.
 
 ## Deploy
 
@@ -49,12 +52,10 @@ Production, Encrypt):
 |---|---|
 | `SESSION_SECRET` | long random string |
 | `POLL_SECRET` | long random string, same one the pinger uses |
-| `REDDIT_CLIENT_ID` | from step 1 |
-| `REDDIT_CLIENT_SECRET` | from step 1 |
-| `EBAY_CLIENT_ID` | from step 2 |
-| `EBAY_CLIENT_SECRET` | from step 2 |
-| `VAPID_PUBLIC_KEY` | from step 3 |
-| `VAPID_PRIVATE_KEY` | from step 3, the whole JSON line |
+| `EBAY_CLIENT_ID` | from step 1 |
+| `EBAY_CLIENT_SECRET` | from step 1 |
+| `VAPID_PUBLIC_KEY` | from step 2 |
+| `VAPID_PRIVATE_KEY` | from step 2, the whole JSON line |
 | `VAPID_SUBJECT` | `mailto:you@example.com` |
 | `PUBLIC_ORIGIN` | `https://undercut.pages.dev` |
 

@@ -8,7 +8,7 @@ const ENTITIES = {
   "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'", "&#39;": "'",
 };
 
-function unescapeXml(s) {
+export function unescapeXml(s) {
   return s.replace(/&(?:amp|lt|gt|quot|apos|#39);/g, (m) => ENTITIES[m] ?? m);
 }
 
@@ -56,22 +56,26 @@ export function rssItemToRaw(item) {
   };
 }
 
-export async function fetchFeed(url, fetchImpl) {
+// Shared by every feed-based source adapter (RSS 2.0 and Atom alike): fetch,
+// confirm it is actually feed-shaped, and hand back the raw text for the
+// caller's own item/entry extraction. A 200 is not proof of a feed — Slickdeals,
+// Woot, and Reddit all answer 200 with an HTML error or bot-challenge page when
+// unhappy, and parsing that to zero items would look identical to a quiet feed.
+//
+// Note the deliberate asymmetry with callers: zero items/entries INSIDE a
+// valid feed document is a legitimately quiet feed and stays allowed. Only a
+// non-feed response is an error.
+export async function fetchFeedText(url, fetchImpl) {
   const res = await fetchImpl(url, { headers: { "user-agent": "undercut/1.0 (private deal watcher)" } });
   if (!res.ok) throw new Error(`feed fetch failed for ${url}: ${res.status}`);
   const text = await res.text();
-
-  // A 200 is not proof we got a feed. Slickdeals and Woot both answer 200 with
-  // an HTML error or bot-challenge page when they are unhappy, and parseRss
-  // would quietly turn that into zero items, which is indistinguishable from a
-  // quiet feed. Insist on an RSS-shaped root before parsing.
-  //
-  // Note the deliberate asymmetry with the Reddit adapter: zero `<item>`
-  // elements INSIDE a valid RSS document is a legitimately quiet feed and stays
-  // allowed. Only a non-feed response is an error.
   if (!/<(rss|feed|channel)\b/i.test(text)) {
     const head = text.slice(0, 60).replace(/\s+/g, " ").trim();
     throw new Error(`feed at ${url} did not return RSS (got: ${head})`);
   }
-  return parseRss(text);
+  return text;
+}
+
+export async function fetchFeed(url, fetchImpl) {
+  return parseRss(await fetchFeedText(url, fetchImpl));
 }

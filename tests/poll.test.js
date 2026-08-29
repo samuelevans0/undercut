@@ -6,21 +6,18 @@ import { signPollRequest } from "../src/lib/hmac-auth.js";
 import { seedReferences } from "../src/db/refs.js";
 import { addPushSub } from "../src/db/prefs.js";
 import seedJson from "../seed/reference-prices.json";
-import redditFixture from "./fixtures/reddit-buildapcsales.json";
-import { _resetTokenCache } from "../src/sources/reddit.js";
+import redditFixture from "./fixtures/reddit-buildapcsales-poll.atom.xml?raw";
 
 const NOW = 1_800_000_000;
 
 function fakeFetch() {
   return vi.fn(async (url) => {
-    if (String(url).includes("access_token")) return Response.json({ access_token: "t", expires_in: 3600 });
-    if (String(url).includes("oauth.reddit.com")) return Response.json(redditFixture);
+    if (String(url).includes("reddit.com/r/")) return new Response(redditFixture, { status: 200, headers: { "content-type": "application/atom+xml" } });
     throw new Error(`unexpected fetch ${url}`);
   });
 }
 
 beforeEach(async () => {
-  _resetTokenCache();
   await env.DB.prepare("DELETE FROM notifications").run();
   await env.DB.prepare("DELETE FROM deal_events").run();
   await env.DB.prepare("DELETE FROM deals").run();

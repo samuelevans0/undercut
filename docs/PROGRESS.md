@@ -6,21 +6,59 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
-Task 21 in progress (2026-08-29): `README.md` written per the plan (local dev,
-credentials needed, deploy steps, claim-immediately warning, iPhone push
-setup, diagnosing queries). Full suite reconfirmed at 265/265 green, unchanged
-from Task 20. Spec section 17 assumption 2 (Reddit without OAuth) got a
-partial, inconclusive check: an unauthenticated request to
-`reddit.com/r/buildapcsales/new.json` from a residential IP returned 403
-immediately. That is not the real test — Cloudflare Worker egress IPs are a
-different range and Reddit's blocking is IP-reputation-based — but it is a
-signal the OAuth dependency is probably load-bearing, not optional. The
-authoritative check still needs to run from the deployed Worker per the
-plan's Step 3. Everything else in Task 21 (actual deploy, binding D1, setting
-secrets, the pinger dashboard-paste, end-to-end iPhone verification, the
-whole-branch review) needs Samuel: three third-party credentials (Reddit
-OAuth app, eBay developer key, VAPID keys) and the deploy itself is a
-production action outside assistant autonomy.
+Task 21 in progress (2026-08-29): spec section 17 assumption 2 (Reddit without
+OAuth) turned out to be moot, not just unverified. Samuel tried to register the
+Reddit OAuth app the plan called for and the create-app form silently failed
+every time, in incognito, across multiple accounts — not a local/extension
+issue. Reddit closed self-serve API app registration in **November 2025**
+(reddit's own "Responsible Builder Policy"), replacing it with a manual
+ticketed-approval process with no guaranteed turnaround and, per community
+reports, a high rejection rate for small/personal use cases. This predates
+this project's 2026-07-25 spec, so the plan's "free, self-serve OAuth app"
+assumption was already false when the build started.
+
+**Fix: `src/sources/reddit.js` rewritten to read Reddit's public
+`r/<sub>/new.rss` Atom feed instead of the OAuth JSON API.** No credentials
+needed at all — `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` are gone from
+`README.md`, `vitest.config.js`, and the deploy checklist entirely. Verified
+via curl before committing to the rewrite: the plain feed URL returns 200
+with real entries; adding `?limit=` to it trips Reddit's bot-detection into a
+403 "Blocked" page, so the adapter deliberately omits query params and
+accepts the feed's default page size (25). Confirmed via TDD: wrote
+`tests/fixtures/reddit-buildapcsales.atom.xml` and a new
+`tests/source-reddit.test.js` first (11 tests, watched all 11 fail against
+the old OAuth code for the right reason), then rewrote the adapter to parse
+Atom `<entry>` blocks — id, title, published date, and the outbound retailer
+URL scraped out of the `<content>` HTML's `[link]`-labelled anchor (falling
+back to the entry's own Reddit comments link for text/discussion posts that
+have no outbound link at all). `src/sources/rss.js` gained an exported
+`fetchFeedText`/`unescapeXml` (small refactor extracting the fetch+validate
+step already shared by Slickdeals/Woot; their own tests still pass
+unchanged) so Reddit's Atom parsing could reuse the same feed-shape
+validation and entity-unescaping instead of duplicating it.
+
+**Real, permanent trade-off:** the JSON API's `ups`/`num_comments` fields
+have no Atom equivalent, so Reddit items always get `upvotes: null,
+comments: null` now. `score.js`'s heat component already treats a missing
+signal as "no activity data" (0 points) rather than erroring, so this
+degrades gracefully — Reddit deals are scored on price/classification alone,
+with no velocity signal. Verified this doesn't regress anything load-bearing:
+`tests/poll.test.js`'s "classifies and scores the monitor as an outlier"
+test (a deal that scored ≥90 partly via upvote/comment heat under the old
+JSON fixture) still clears the same ≥90 bar on price/discount alone with the
+new null-heat RSS fixture — rewrote `poll.test.js`'s reddit fixture and mock
+to match (`tests/fixtures/reddit-buildapcsales-poll.atom.xml`, replacing the
+deleted `reddit-buildapcsales.json`), full suite green at 263/263 (265 minus
+2: the OAuth-specific tests — credential-missing, token-caching, basic-auth
+header — no longer apply and weren't replaced 1:1).
+
+`README.md` also written per the plan otherwise unchanged (local dev, deploy
+steps, claim-immediately warning, iPhone push setup, diagnosing queries).
+Everything else in Task 21 (actual deploy, binding D1, setting secrets, the
+pinger dashboard-paste, end-to-end iPhone verification, the whole-branch
+review) needs Samuel: an eBay developer key, VAPID keys, and the deploy
+itself is a production action outside assistant autonomy. Walking through
+credential-gathering live with him, in progress.
 
 Task 20 done: the cron-pinger Worker. `cron-pinger/worker.js` exports a
 `scheduled(event, env, ctx, fetchImpl = fetch)` handler that fans out one
@@ -464,4 +502,9 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
       listRules, markSuccess). Skipped (unparseable-price) items cost zero DB
       calls. Not optimised per the brief; flagged for the deploy task to
       measure against the actual free-tier CPU/subrequest budget.
-- [ ] Reddit requires OAuth from Cloudflare datacenter IPs
+- [x] Reddit requires OAuth from Cloudflare datacenter IPs — **moot, not
+      resolved either way.** Reddit closed self-serve OAuth app registration
+      in November 2025, so the question of whether Cloudflare's IPs specifically
+      would be blocked never got answered; the adapter was rewritten to use
+      the public unauthenticated `new.rss` feed instead, which needs no OAuth
+      token regardless of source IP. See Status above.
