@@ -6,6 +6,22 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+Task 21 in progress (2026-08-29): `README.md` written per the plan (local dev,
+credentials needed, deploy steps, claim-immediately warning, iPhone push
+setup, diagnosing queries). Full suite reconfirmed at 265/265 green, unchanged
+from Task 20. Spec section 17 assumption 2 (Reddit without OAuth) got a
+partial, inconclusive check: an unauthenticated request to
+`reddit.com/r/buildapcsales/new.json` from a residential IP returned 403
+immediately. That is not the real test — Cloudflare Worker egress IPs are a
+different range and Reddit's blocking is IP-reputation-based — but it is a
+signal the OAuth dependency is probably load-bearing, not optional. The
+authoritative check still needs to run from the deployed Worker per the
+plan's Step 3. Everything else in Task 21 (actual deploy, binding D1, setting
+secrets, the pinger dashboard-paste, end-to-end iPhone verification, the
+whole-branch review) needs Samuel: three third-party credentials (Reddit
+OAuth app, eBay developer key, VAPID keys) and the deploy itself is a
+production action outside assistant autonomy.
+
 Task 20 done: the cron-pinger Worker. `cron-pinger/worker.js` exports a
 `scheduled(event, env, ctx, fetchImpl = fetch)` handler that fans out one
 signed POST per source (`reddit`, `slickdeals`, `woot`, `ebay`) to
@@ -339,7 +355,7 @@ Fixed with `Number.isInteger(config.cursor) && config.cursor >= 0`.
 - [x] T18 settings UI
 - [x] T19 PWA shell + push
 - [x] T20 cron-pinger
-- [ ] T21 deploy runbook
+- [~] T21 deploy runbook (README written, tests confirmed; deploy itself waits on Samuel's credentials)
 
 ## Gotchas found
 - Task 2 brief's prose said "15 tests" / "18 tests total" for tests/lib.test.js
