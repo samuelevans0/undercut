@@ -23,7 +23,12 @@ Tests: `npx vitest run`
 All free, all one-time.
 
 1. **eBay developer key.** developer.ebay.com, create a Production keyset.
-   Keep the App ID (client ID) and Cert ID (client secret).
+   Keep the App ID (client ID) and Cert ID (client secret). Then, next to the
+   App ID, open **Notifications** and toggle **"Exempted from Marketplace
+   Account Deletion"** on, choosing "I do not persist eBay data" — eBay
+   disables Production keysets that skip this, and a disabled keyset fails
+   auth with a plain `401 invalid_client`, no hint that compliance is the
+   cause.
 2. **VAPID keys.** `npm run vapid`, keep both lines it prints.
 3. **A random `POLL_SECRET` and `SESSION_SECRET`.** Any long random strings.
 
@@ -32,6 +37,23 @@ in November 2025 (a manual, ticketed, no-guaranteed-turnaround process now),
 so this reads Reddit's public `new.rss` feed instead, which needs no key at
 all. Trade-off: no upvote/comment signal from Reddit, which only ever fed the
 optional "heat" score component.
+
+**Woot is disabled by default.** Its RSS feed is dead site-wide (discontinued
+long ago); the adapter now reads Woot's real developer API instead, but that
+needs an API key requested via the Woot forums and issued weekly, not
+self-serve. To enable it once you have a key: set `WOOT_API_KEY` as a Pages
+secret, then `UPDATE sources SET enabled = 1 WHERE id = 'woot'`.
+
+**eBay searches its own query list, not the watchlist.** `sources.config_json`
+for the `ebay` row holds `{"queries": [...], "cursor": N}` — one query per
+poll, cycling through the list. There's no UI for this yet; set it directly:
+`UPDATE sources SET config_json = '{"queries":["term one","term two"],"cursor":0}' WHERE id = 'ebay'`.
+Keep these broad (category-level) — the watchlist table is for the opposite
+case: narrow, specific things you want an instant alert on *regardless of
+score* (its terms match if every word appears anywhere in a deal's title, so
+broad multi-word terms there catch a lot of false positives — "graphics card"
+matched a baseball card whose seller was "Perma-Graphics" selling "Credit
+Cards").
 
 ## Deploy
 

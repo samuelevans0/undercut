@@ -6,6 +6,73 @@ Plan: `docs/superpowers/plans/2026-07-25-undercut-implementation.md`
 Read this file first when resuming. Update it at the end of every task.
 
 ## Status
+**Deployed and live (2026-08-29) at https://undercut-5sl.pages.dev** (the
+plain `undercut.pages.dev` subdomain was already taken). D1 bound, all 8
+production secrets set, instance claimed, cron-pinger deployed and firing.
+Verified end-to-end via manual signed polls against the live API before
+trusting the pinger: **Reddit, Slickdeals, and eBay all confirmed genuinely
+working** (25, 25, and 50 items respectively). **Woot disabled** — see below.
+
+Two real bugs found live that no test caught, because both needed an actual
+external API to surface:
+1. **eBay's Production keyset was silently disabled** by eBay's marketplace-
+   account-deletion compliance requirement (unrelated to this project,
+   rolled out after the spec was written). Manifested as a plain `401
+   invalid_client` with no hint of the real cause. Fixed by toggling
+   "Exempted from Marketplace Account Deletion" → "I do not persist eBay
+   data" on the keyset's Notifications page. Now in the README as a
+   required deploy step.
+2. **eBay's search queries were wired to the `watchlist` table**
+   (`poll.js`'s eBay branch overwrote `config.queries` with
+   `watchlist.map(w => w.query)` every poll), and watchlist entries also
+   force a notification on any match *regardless of score*
+   (`shouldNotify`'s `forceNotify` path). A broad, category-level eBay
+   search term like "graphics card" therefore force-pushed for nearly
+   every GPU listing that appeared — the opposite of the app's whole
+   premise. Caught live: Samuel added 22 broad category terms to the
+   watchlist as eBay's search list (his explicit choice, after being
+   warned), then watched the feed and asked "how do I find genuinely good
+   deals instead of every graphics card" — the real answer being that the
+   score pipeline already does this, it was just being bypassed. Fixed via
+   TDD: eBay now reads `sources.config_json.queries` independently of the
+   watchlist; watchlist stays reserved for narrow "alert me on this
+   specific thing regardless of price" alerts. A second bug in the same
+   area, also caught live: the post-poll write-back stripped `queries`
+   back out of `config_json` after every single poll (a leftover from the
+   old watchlist-repopulates-it design), so the fix's own first deploy
+   made eBay's second poll return zero results until that was fixed too.
+   The 22 broad terms were moved out of watchlist (now empty) since they
+   only ever needed to live in eBay's own query config.
+
+**Reddit's OAuth JSON API turned out to be closed**, discovered when Samuel
+could not get Reddit's create-app form to submit (silently failed, no error,
+reproduced in incognito across multiple accounts). Reddit closed self-serve
+API app registration in November 2025 — before this project's 2026-07-25
+spec was even written — replacing it with a manual ticketed-approval process
+with no guaranteed turnaround. Fixed via TDD: `src/sources/reddit.js`
+rewritten to read the public, unauthenticated `r/<sub>/new.rss` Atom feed
+instead. No credentials needed at all now. Trade-off: no upvote/comment
+signal (Atom has no equivalent field), which `score.js` already treats as
+"no activity data" (0 points) rather than erroring — degrades gracefully.
+`REDDIT_CLIENT_ID`/`SECRET` removed from `README.md` and `vitest.config.js`
+entirely.
+
+**Woot's RSS feed (`/salerss`) turned out to be dead site-wide** — 404 on
+every subdomain, discontinued long before this project started (forum
+threads suggest since ~2019, never caught because the build only ever
+tested against a static local fixture). Woot does have a real developer API
+(`developer.woot.com`, real OpenAPI docs with a working example — worth
+noting the docs' own "example response" and formal `FeedPage` schema
+disagree on the top-level shape, `{Items:[...]}` vs a bare array; the
+adapter accepts both defensively rather than guessing), but its key is not
+self-serve — requested via the Woot forums, "issued weekly, be patient."
+Given Samuel's choice ("build the adapter now, key later"), `src/sources/
+woot.js` was rewritten via TDD against the real documented schema and the
+Woot source disabled in production (`enabled = 0`) until a key exists. Not
+live-verified (no key yet) — this is the one piece of today's work that
+rests on documentation rather than a live API response, flagged as such.
+
+Original Task 21 text below, superseded by the above:
 Task 21 in progress (2026-08-29): spec section 17 assumption 2 (Reddit without
 OAuth) turned out to be moot, not just unverified. Samuel tried to register the
 Reddit OAuth app the plan called for and the create-app form silently failed
