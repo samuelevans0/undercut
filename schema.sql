@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 INSERT OR IGNORE INTO sources (id, name, poll_interval_s, config_json) VALUES
-  ('reddit',     'Reddit',     60,  '{"subreddits":["buildapcsales"]}'),
+  ('reddit',     'Reddit',     300, '{"subreddits":["buildapcsales"]}'),
   ('slickdeals', 'Slickdeals', 300, '{}'),
   ('woot',       'Woot',       900, '{}'),
   ('ebay',       'eBay',       300, '{}');
