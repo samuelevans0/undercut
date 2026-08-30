@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { parseRss } from "../src/sources/rss.js";
+import { parseRss, fetchFeedText } from "../src/sources/rss.js";
 import { slickdealsAdapter } from "../src/sources/slickdeals.js";
 // The brief's fixture loader was `readFileSync(new URL(...), "utf8")`. That
 // cannot work in this environment: @cloudflare/vitest-pool-workers runs every
@@ -86,3 +86,17 @@ describe("slickdealsAdapter", () => {
 
 // wootAdapter now reads Woot's real developer API, not RSS. Its own coverage
 // lives in tests/source-woot.test.js.
+
+describe("fetchFeedText headers", () => {
+  it("sends the default undercut user-agent with no override", async () => {
+    const f = vi.fn(async () => new Response("<rss><channel></channel></rss>", { status: 200 }));
+    await fetchFeedText("https://example.test/feed", f);
+    expect(f.mock.calls[0][1].headers["user-agent"]).toMatch(/undercut/i);
+  });
+
+  it("lets a caller override headers, e.g. a browser-like user-agent", async () => {
+    const f = vi.fn(async () => new Response("<rss><channel></channel></rss>", { status: 200 }));
+    await fetchFeedText("https://example.test/feed", f, { "user-agent": "Mozilla/5.0 test" });
+    expect(f.mock.calls[0][1].headers["user-agent"]).toBe("Mozilla/5.0 test");
+  });
+});

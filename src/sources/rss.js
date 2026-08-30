@@ -65,8 +65,8 @@ export function rssItemToRaw(item) {
 // Note the deliberate asymmetry with callers: zero items/entries INSIDE a
 // valid feed document is a legitimately quiet feed and stays allowed. Only a
 // non-feed response is an error.
-export async function fetchFeedText(url, fetchImpl) {
-  const res = await fetchImpl(url, { headers: { "user-agent": "undercut/1.0 (private deal watcher)" } });
+export async function fetchFeedText(url, fetchImpl, headers = {}) {
+  const res = await fetchImpl(url, { headers: { "user-agent": "undercut/1.0 (private deal watcher)", ...headers } });
   if (!res.ok) throw new Error(`feed fetch failed for ${url}: ${res.status}`);
   const text = await res.text();
   if (!/<(rss|feed|channel)\b/i.test(text)) {

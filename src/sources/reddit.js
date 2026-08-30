@@ -18,6 +18,12 @@ import { fetchFeedText, unescapeXml } from "./rss.js";
 const ENTRY_RE = /<entry>([\s\S]*?)<\/entry>/g;
 const LINK_RE = /<a\s+href="([^"]+)">\s*\[link\]\s*<\/a>/i;
 
+// A Cloudflare Worker's datacenter IP combined with the shared app-identifying
+// "undercut/1.0" UA was observed live tripping Reddit's bot detection into
+// 403s that plain curl from a residential IP with a browser UA never hit.
+// A browser-like UA is the standard low-risk mitigation for an RSS reader.
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+
 function tag(block, name) {
   const re = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, "i");
   const m = block.match(re);
@@ -68,7 +74,7 @@ export const redditAdapter = {
 
     const items = [];
     for (const sub of subs) {
-      const text = await fetchFeedText(`https://www.reddit.com/r/${encodeURIComponent(sub)}/new.rss`, fetchImpl);
+      const text = await fetchFeedText(`https://www.reddit.com/r/${encodeURIComponent(sub)}/new.rss`, fetchImpl, { "user-agent": UA });
       for (const match of text.matchAll(ENTRY_RE)) {
         items.push(toRawItem(match[1]));
       }

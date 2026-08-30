@@ -43,6 +43,19 @@ describe("redditAdapter", () => {
     expect(discussion.url).toBe("https://www.reddit.com/r/buildapcsales/comments/jkl000/discussion_thread/");
   });
 
+  it("sends a browser-like user-agent, not an app-identifying one", async () => {
+    // A Cloudflare Worker's datacenter IP combined with a non-browser UA
+    // (the shared "undercut/1.0" default) was observed live tripping
+    // Reddit's bot detection into 403s that plain curl from a residential IP
+    // never hit. A browser UA is the standard low-risk mitigation for an
+    // RSS reader.
+    const f = okWith(atomXml);
+    await redditAdapter.list({}, { subreddits: ["x"] }, f);
+    const ua = f.mock.calls[0][1].headers["user-agent"];
+    expect(ua).toMatch(/Mozilla/);
+    expect(ua).not.toMatch(/undercut/i);
+  });
+
   it("reads multiple subreddits", async () => {
     const f = okWith(atomXml);
     const items = await redditAdapter.list({}, { subreddits: ["a", "b"] }, f);
