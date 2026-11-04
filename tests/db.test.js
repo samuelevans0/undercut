@@ -125,6 +125,73 @@ describe("deals", () => {
     expect(JSON.parse(row.score_reasons_json)[0].key).toBe("outlier");
   });
 
+  it("does not rewrite an unchanged deal seen again inside the stale window", async () => {
+    const first = await upsertDeal(env.DB, sampleDeal(), NOW);
+    const second = await upsertDeal(env.DB, sampleDeal(), NOW + 60);
+    expect(second.id).toBe(first.id);
+    expect(second.changed).toBe(false);
+    const row = await getDeal(env.DB, second.id);
+    expect(row.last_seen_at).toBe(NOW);
+  });
+
+  it("still refreshes last_seen_at for an unchanged deal once the stale window elapses", async () => {
+    await upsertDeal(env.DB, sampleDeal(), NOW);
+    const second = await upsertDeal(env.DB, sampleDeal(), NOW + 1300);
+    expect(second.changed).toBe(false);
+    const row = await getDeal(env.DB, second.id);
+    expect(row.last_seen_at).toBe(NOW + 1300);
+  });
+
+  it("reports changed and updates every field when something actually differs", async () => {
+    await upsertDeal(env.DB, sampleDeal(), NOW);
+    const second = await upsertDeal(env.DB, sampleDeal({ priceCents: 5000 }), NOW + 5);
+    expect(second.changed).toBe(true);
+    const row = await getDeal(env.DB, second.id);
+    expect(row.price_cents).toBe(5000);
+    expect(row.last_seen_at).toBe(NOW + 5);
+  });
+
+  it("skips a duplicate event when nothing changed since the last observation", async () => {
+    const { id } = await upsertDeal(env.DB, sampleDeal(), NOW);
+    const first = await appendEvent(env.DB, id, { priceCents: 6000, upvotes: 10, comments: 2 }, NOW);
+    const second = await appendEvent(env.DB, id, { priceCents: 6000, upvotes: 10, comments: 2 }, NOW + 300);
+    expect(first.inserted).toBe(true);
+    expect(second.inserted).toBe(false);
+    const events = await listEvents(env.DB, id);
+    expect(events).toHaveLength(1);
+  });
+
+  it("appends a new event when the price moves", async () => {
+    const { id } = await upsertDeal(env.DB, sampleDeal(), NOW);
+    await appendEvent(env.DB, id, { priceCents: 6000, upvotes: 10, comments: 2 }, NOW);
+    await appendEvent(env.DB, id, { priceCents: 5000, upvotes: 10, comments: 2 }, NOW + 300);
+    const events = await listEvents(env.DB, id);
+    expect(events).toHaveLength(2);
+  });
+
+  it("appends a new event when only upvotes or comments move, price held", async () => {
+    const { id } = await upsertDeal(env.DB, sampleDeal(), NOW);
+    await appendEvent(env.DB, id, { priceCents: 6000, upvotes: 10, comments: 2 }, NOW);
+    await appendEvent(env.DB, id, { priceCents: 6000, upvotes: 45, comments: 2 }, NOW + 300);
+    const events = await listEvents(env.DB, id);
+    expect(events).toHaveLength(2);
+  });
+
+  it("does not rewrite the score when it has not changed", async () => {
+    const { id } = await upsertDeal(env.DB, sampleDeal(), NOW);
+    const first = await setScore(env.DB, id, 99, [{ key: "outlier", points: 50 }]);
+    const second = await setScore(env.DB, id, 99, [{ key: "outlier", points: 50 }]);
+    expect(first.updated).toBe(true);
+    expect(second.updated).toBe(false);
+  });
+
+  it("rewrites the score when the reasons change even if the number does not", async () => {
+    const { id } = await upsertDeal(env.DB, sampleDeal(), NOW);
+    await setScore(env.DB, id, 99, [{ key: "outlier", points: 50 }]);
+    const second = await setScore(env.DB, id, 99, [{ key: "outlier", points: 40 }, { key: "fresh", points: 10 }]);
+    expect(second.updated).toBe(true);
+  });
+
   it("records the notified price", async () => {
     const { id } = await upsertDeal(env.DB, sampleDeal(), NOW);
     await markNotified(env.DB, id, 6000, NOW);

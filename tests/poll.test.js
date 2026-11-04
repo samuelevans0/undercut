@@ -84,6 +84,16 @@ describe("pollSource", () => {
     expect(row.n).toBe(2);
   });
 
+  it("does not write duplicate events or rewrite deals when a re-poll sees the same listings", async () => {
+    await pollSource(env, "reddit", NOW, { fetchImpl: fakeFetch(), sendImpl: async () => ({ ok: true }) });
+    await env.DB.prepare("UPDATE sources SET last_polled_at = NULL WHERE id = 'reddit'").run();
+    await pollSource(env, "reddit", NOW + 60, { fetchImpl: fakeFetch(), sendImpl: async () => ({ ok: true }) });
+    const events = await env.DB.prepare("SELECT COUNT(*) AS n FROM deal_events").first();
+    expect(events.n).toBe(2);
+    const row = await env.DB.prepare("SELECT last_seen_at FROM deals WHERE category = 'monitor'").first();
+    expect(row.last_seen_at).toBe(NOW);
+  });
+
   it("records a failure and never throws when the source errors", async () => {
     const boom = vi.fn(async () => { throw new Error("network down"); });
     const r = await pollSource(env, "reddit", NOW, { fetchImpl: boom, sendImpl: async () => ({ ok: true }) });
